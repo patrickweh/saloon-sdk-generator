@@ -8,14 +8,14 @@ use Crescat\SaloonSdkGenerator\Data\Generator\SecurityRequirement;
 use Crescat\SaloonSdkGenerator\Data\Generator\ServerParameter;
 use Crescat\SaloonSdkGenerator\Generators\ConnectorGenerator;
 
-beforeEach(function () {
+beforeEach(function (): void {
     $this->generator = new ConnectorGenerator(new Config(
         connectorName: 'Client',
         namespace: 'Crescat'
     ));
 });
 
-it('Supports server parameter in the baseUrl', function () {
+it('Supports server parameter in the baseUrl', function (): void {
     $phpFile = $this->generator->generate(new ApiSpecification(
         name: 'Example',
         description: 'Example API',
@@ -46,7 +46,7 @@ it('Supports server parameter in the baseUrl', function () {
         ->and($resolveBaseUrl->getBody())->toBe('return "https://api-{$this->region}.example.com/v1/";');
 });
 
-it('Supports multiple server parameters in the baseUrl', function () {
+it('Supports multiple server parameters in the baseUrl', function (): void {
     $phpFile = $this->generator->generate(new ApiSpecification(
         name: 'Example',
         description: 'Example API',

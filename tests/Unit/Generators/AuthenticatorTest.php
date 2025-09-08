@@ -12,15 +12,14 @@ use Crescat\SaloonSdkGenerator\Generators\ConnectorGenerator;
 use Nette\PhpGenerator\ClassType;
 use Nette\PhpGenerator\Method;
 
-beforeEach(function () {
+beforeEach(function (): void {
     $this->generator = new ConnectorGenerator(new Config(
         connectorName: 'Client',
         namespace: 'Crescat'
     ));
 });
 
-it('handles basic authentication', function () {
-
+it('handles basic authentication', function (): void {
     $connectorPhpFile = $this->generator->generate(new ApiSpecification(
         name: 'Example',
         description: 'Example API',
@@ -56,8 +55,7 @@ it('handles basic authentication', function () {
         ->and($class->getMethods()['__construct']->hasParameter('password'))->toBeTrue();
 });
 
-it('handles digest authentication', function () {
-
+it('handles digest authentication', function (): void {
     $connectorPhpFile = $this->generator->generate(new ApiSpecification(
         name: 'Example',
         description: 'Example API',
@@ -91,8 +89,7 @@ it('handles digest authentication', function () {
         ->and($defaultAuth->getBody())->toBe('return new DigestAuthenticator($this->username, $this->password, "digest");');
 });
 
-it('handles bearer token authentication', function () {
-
+it('handles bearer token authentication', function (): void {
     $connectorPhpFile = $this->generator->generate(new ApiSpecification(
         name: 'Example',
         description: 'Example API',
@@ -127,8 +124,7 @@ it('handles bearer token authentication', function () {
         ->and($class->getMethods()['__construct']->hasParameter('bearerToken'))->toBeTrue();
 });
 
-it('handles api key authentication in the header with X- prefix', function () {
-
+it('handles api key authentication in the header with X- prefix', function (): void {
     $connectorPhpFile = $this->generator->generate(new ApiSpecification(
         name: 'Example',
         description: 'Example API',
@@ -164,8 +160,7 @@ it('handles api key authentication in the header with X- prefix', function () {
         ->and($class->getMethods()['__construct']->hasParameter('apiKey'))->toBeTrue();
 });
 
-it('handles api key authentication in the header without X- prefix', function () {
-
+it('handles api key authentication in the header without X- prefix', function (): void {
     $connectorPhpFile = $this->generator->generate(new ApiSpecification(
         name: 'Example',
         description: 'Example API',
@@ -203,8 +198,7 @@ it('handles api key authentication in the header without X- prefix', function ()
         ->and($class->getMethods()['__construct']->hasParameter('ocpApimSubscriptionKey'))->toBeTrue();
 });
 
-it('handles api key authentication in the query', function () {
-
+it('handles api key authentication in the query', function (): void {
     $connectorPhpFile = $this->generator->generate(new ApiSpecification(
         name: 'Example',
         description: 'Example API',

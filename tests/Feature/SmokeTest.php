@@ -2,7 +2,7 @@
 
 use Illuminate\Support\Facades\Process;
 
-test('All of the sample APIs can be generated without throwing crashing', function () {
+test('All of the sample APIs can be generated without throwing crashing', function (): void {
     $process = Process::run($command = 'composer generate:all');
 
     expect($process->successful())

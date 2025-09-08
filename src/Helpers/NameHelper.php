@@ -82,9 +82,19 @@ class NameHelper
         'yield',
     ];
 
+    protected static array $classNameCache = [];
+
     protected static array $variableNameCache = [];
 
-    protected static array $classNameCache = [];
+    public static function connectorClassName(string $value): string
+    {
+        return self::safeClassName($value, 'Connector');
+    }
+
+    public static function dtoClassName(string $value): string
+    {
+        return self::safeClassName($value, 'Dto');
+    }
 
     public static function normalize(string $value): string
     {
@@ -122,21 +132,14 @@ class NameHelper
         return $value;
     }
 
-    /**
-     * Transforms a string into something that can be used
-     * as a method or variable identifier in PHP
-     * ex: "list all (_new_) users" -> listAllNewUsers
-     */
-    public static function safeVariableName(string $value): string
+    public static function requestClassName(string $value): string
     {
-        if (isset(self::$variableNameCache[$value])) {
-            return self::$variableNameCache[$value];
-        }
+        return self::safeClassName($value, 'Request');
+    }
 
-        $result = Str::of(self::normalize($value))->camel();
-        self::$variableNameCache[$value] = $result;
-
-        return $result;
+    public static function resourceClassName(string $value): string
+    {
+        return self::safeClassName($value, 'Resource');
     }
 
     /**
@@ -156,23 +159,20 @@ class NameHelper
         return $result;
     }
 
-    public static function dtoClassName(string $value): string
+    /**
+     * Transforms a string into something that can be used
+     * as a method or variable identifier in PHP
+     * ex: "list all (_new_) users" -> listAllNewUsers
+     */
+    public static function safeVariableName(string $value): string
     {
-        return self::safeClassName($value, 'Dto');
-    }
+        if (isset(self::$variableNameCache[$value])) {
+            return self::$variableNameCache[$value];
+        }
 
-    public static function resourceClassName(string $value): string
-    {
-        return self::safeClassName($value, 'Resource');
-    }
+        $result = Str::of(self::normalize($value))->camel();
+        self::$variableNameCache[$value] = $result;
 
-    public static function requestClassName(string $value): string
-    {
-        return self::safeClassName($value, 'Request');
-    }
-
-    public static function connectorClassName(string $value): string
-    {
-        return self::safeClassName($value, 'Connector');
+        return $result;
     }
 }

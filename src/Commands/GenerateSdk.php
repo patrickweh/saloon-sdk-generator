@@ -16,6 +16,8 @@ use ZipArchive;
 
 class GenerateSdk extends Command
 {
+    protected $description = 'Generate an SDK based on an API specification file.';
+
     protected $signature = 'generate:sdk
                             {path : Path to the API specification file to generate the SDK from, must be a local file}
                             {--type=postman : The type of API Specification (postman, openapi)}
@@ -25,8 +27,6 @@ class GenerateSdk extends Command
                             {--force : Force overwriting existing files}
                             {--dry : Dry run, will only show the files to be generated, does not create or modify any files.}
                             {--zip : Generate a zip archive containing all the files}';
-
-    protected $description = 'Generate an SDK based on an API specification file.';
 
     public function handle(): void
     {
@@ -66,7 +66,7 @@ class GenerateSdk extends Command
                 $this->warn('Note: the --type option is used to specify the API Specification type (ex: openapi, postman), not the file format.');
             }
 
-            $this->line('Available types: '.implode(', ', Factory::getRegisteredParserTypes()));
+            $this->line('Available types: ' . implode(', ', Factory::getRegisteredParserTypes()));
 
             return;
         }
@@ -82,31 +82,6 @@ class GenerateSdk extends Command
         $this->option('zip')
             ? $this->generateZipArchive($result)
             : $this->dumpGeneratedFiles($result);
-    }
-
-    protected function printGeneratedFiles(GeneratedCode $result): void
-    {
-        $this->title('Generated Files');
-
-        $this->comment("\nConnector:");
-        if ($result->connectorClass) {
-            $this->line(Utils::formatNamespaceAndClass($result->connectorClass));
-        }
-
-        $this->comment("\nResources:");
-        foreach ($result->resourceClasses as $resourceClass) {
-            $this->line(Utils::formatNamespaceAndClass($resourceClass));
-        }
-
-        $this->comment("\nRequests:");
-        foreach ($result->requestClasses as $requestClass) {
-            $this->line(Utils::formatNamespaceAndClass($requestClass));
-        }
-
-        $this->comment("\nDTOs:");
-        foreach ($result->dtoClasses as $dtoClass) {
-            $this->line(Utils::formatNamespaceAndClass($dtoClass));
-        }
     }
 
     protected function dumpGeneratedFiles(GeneratedCode $result): void
@@ -132,16 +107,28 @@ class GenerateSdk extends Command
         foreach ($result->dtoClasses as $dtoClass) {
             $this->dumpToFile($dtoClass);
         }
+
+        $this->comment("\nEnums:");
+        foreach ($result->enumClasses as $enumClass) {
+            $this->dumpToFile($enumClass);
+        }
     }
 
     protected function dumpToFile(PhpFile $file): void
     {
         // TODO: Cleanup this, brittle and will break if you change the namespace
+        $namespace = Arr::first($file->getNamespaces());
+        $classes = $file->getClasses();
+        $enums = method_exists($namespace, 'getEnums') ? $namespace->getEnums() : [];
+
+        // Get the name from either class or enum
+        $name = ! empty($classes) ? Arr::first($classes)->getName() : Arr::first($enums)->getName();
+
         $wip = sprintf(
             '%s/%s/%s.php',
             $this->option('output'),
-            str_replace($this->option('namespace'), '', Arr::first($file->getNamespaces())->getName()),
-            Arr::first($file->getClasses())->getName(),
+            str_replace($this->option('namespace'), '', $namespace->getName()),
+            $name,
         );
 
         $filePath = Str::of($wip)->replace('\\', '/')->replace('//', '/')->toString();
@@ -167,8 +154,8 @@ class GenerateSdk extends Command
 
     protected function generateZipArchive(GeneratedCode $result): void
     {
-        $zipFileName = $this->option('name').'_sdk.zip';
-        $zipPath = $this->option('output').DIRECTORY_SEPARATOR.$zipFileName;
+        $zipFileName = $this->option('name') . '_sdk.zip';
+        $zipPath = $this->option('output') . DIRECTORY_SEPARATOR . $zipFileName;
 
         if (! file_exists(dirname($zipPath))) {
             mkdir(dirname($zipPath), recursive: true);
@@ -193,16 +180,61 @@ class GenerateSdk extends Command
             $result->resourceClasses,
             $result->requestClasses,
             $result->dtoClasses,
+            $result->enumClasses,
         );
 
         foreach ($filesToZip as $file) {
-            $filePathInZip = str_replace('\\', '/', Arr::first($file->getNamespaces())->getName()).'/'.Arr::first($file->getClasses())->getName().'.php';
-            $zip->addFromString($filePathInZip, (string) $file);
-            $this->line("- Wrote file to ZIP: $filePathInZip");
+            $namespace = Arr::first($file->getNamespaces());
+            $classes = $file->getClasses();
+            $enums = method_exists($namespace, 'getEnums') ? $namespace->getEnums() : [];
+
+            // Get the name from either class or enum
+            $name = ! empty($classes) ? Arr::first($classes)->getName() : (! empty($enums) ? Arr::first($enums)->getName() : null);
+
+            if ($name) {
+                $filePathInZip = str_replace('\\', '/', $namespace->getName()) . '/' . $name . '.php';
+                $zip->addFromString($filePathInZip, (string) $file);
+                $this->line("- Wrote file to ZIP: $filePathInZip");
+            }
         }
 
         $zip->close();
 
         $this->line("- Created zip archive: $zipPath");
+    }
+
+    protected function printGeneratedFiles(GeneratedCode $result): void
+    {
+        $this->title('Generated Files');
+
+        $this->comment("\nConnector:");
+        if ($result->connectorClass) {
+            $this->line(Utils::formatNamespaceAndClass($result->connectorClass));
+        }
+
+        $this->comment("\nResources:");
+        foreach ($result->resourceClasses as $resourceClass) {
+            $this->line(Utils::formatNamespaceAndClass($resourceClass));
+        }
+
+        $this->comment("\nRequests:");
+        foreach ($result->requestClasses as $requestClass) {
+            $this->line(Utils::formatNamespaceAndClass($requestClass));
+        }
+
+        $this->comment("\nDTOs:");
+        foreach ($result->dtoClasses as $dtoClass) {
+            $this->line(Utils::formatNamespaceAndClass($dtoClass));
+        }
+
+        $this->comment("\nEnums:");
+        foreach ($result->enumClasses as $enumClass) {
+            $namespace = Arr::first($enumClass->getNamespaces());
+            $enums = method_exists($namespace, 'getEnums') ? $namespace->getEnums() : [];
+            if (! empty($enums)) {
+                $enumName = Arr::first($enums)->getName();
+                $this->line($namespace->getName() . '\\' . $enumName);
+            }
+        }
     }
 }

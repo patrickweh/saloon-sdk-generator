@@ -19,10 +19,7 @@ class PostmanCollectionParser implements Parser
 {
     protected array $collectionQueue = [];
 
-    public function __construct(protected PostmanCollection $postmanCollection)
-    {
-
-    }
+    public function __construct(protected PostmanCollection $postmanCollection) {}
 
     public static function build($content): self
     {
@@ -47,33 +44,6 @@ class PostmanCollectionParser implements Parser
         );
     }
 
-    /**
-     * @return array|Endpoint[]
-     */
-    public function parseItems(array $items): array
-    {
-        $requests = [];
-
-        foreach ($items as $item) {
-
-            if ($item instanceof ItemGroup) {
-                // Nested resource Ids aka "{customer_id}" are not considered a "collection", skip those
-                if (! Str::contains($item->name, ['{', '}'])) {
-                    $this->collectionQueue[] = $item->name;
-                }
-
-                $requests = [...$requests, ...$this->parseItems($item->item)];
-                array_pop($this->collectionQueue);
-            }
-
-            if ($item instanceof Item) {
-                $requests = [...$requests, $this->parseEndpoint($item)];
-            }
-        }
-
-        return $requests;
-    }
-
     public function parseEndpoint(Item $item): ?Endpoint
     {
         return new Endpoint(
@@ -90,36 +60,30 @@ class PostmanCollectionParser implements Parser
         );
     }
 
-    protected function parseQueryParameters(Item $item): array
+    /**
+     * @return array|Endpoint[]
+     */
+    public function parseItems(array $items): array
     {
-        return collect($item->request->url->query)->map(function ($param) {
-            if (! Arr::get($param, 'key')) {
-                return null;
+        $requests = [];
+
+        foreach ($items as $item) {
+            if ($item instanceof ItemGroup) {
+                // Nested resource Ids aka "{customer_id}" are not considered a "collection", skip those
+                if (! Str::contains($item->name, ['{', '}'])) {
+                    $this->collectionQueue[] = $item->name;
+                }
+
+                $requests = [...$requests, ...$this->parseItems($item->item)];
+                array_pop($this->collectionQueue);
             }
 
-            return new Parameter(
-                type: 'string',
-                nullable: true,
-                name: Arr::get($param, 'key'),
-                description: Arr::get($param, 'description', '')
-            );
-        })->filter()->values()->toArray();
-    }
+            if ($item instanceof Item) {
+                $requests = [...$requests, $this->parseEndpoint($item)];
+            }
+        }
 
-    protected function parsePathParameters(Item $item): array
-    {
-        return collect($item->request->url->path)
-            ->filter(fn ($segment) => Str::startsWith($segment, ':'))
-            ->map(function ($param) {
-                return new Parameter(
-                    type: 'string',
-                    nullable: false,
-                    name: $param,
-                );
-            })
-            ->filter()
-            ->values()
-            ->toArray();
+        return $requests;
     }
 
     protected function parseBodyParameters(Item $item): array
@@ -176,5 +140,37 @@ class PostmanCollectionParser implements Parser
             })
             ->values()
             ->toArray();
+    }
+
+    protected function parsePathParameters(Item $item): array
+    {
+        return collect($item->request->url->path)
+            ->filter(fn ($segment) => Str::startsWith($segment, ':'))
+            ->map(function ($param) {
+                return new Parameter(
+                    type: 'string',
+                    nullable: false,
+                    name: $param,
+                );
+            })
+            ->filter()
+            ->values()
+            ->toArray();
+    }
+
+    protected function parseQueryParameters(Item $item): array
+    {
+        return collect($item->request->url->query)->map(function ($param) {
+            if (! Arr::get($param, 'key')) {
+                return null;
+            }
+
+            return new Parameter(
+                type: 'string',
+                nullable: true,
+                name: Arr::get($param, 'key'),
+                description: Arr::get($param, 'description', '')
+            );
+        })->filter()->values()->toArray();
     }
 }

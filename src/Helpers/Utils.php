@@ -16,39 +16,6 @@ class Utils
         );
     }
 
-    /**
-     * Wrap long lines of text to a specified maximum line length.
-     *
-     * @param  string  $inputString The input string to be wrapped.
-     * @param  int  $maxLineLength The maximum length of each line (default: 100).
-     * @return string The input string with newlines inserted as needed.
-     */
-    public static function wrapLongLines(string $inputString, int $maxLineLength = 100): string
-    {
-        $outputString = '';
-        $currentLine = '';
-
-        $words = explode(' ', $inputString);
-
-        foreach ($words as $word) {
-            if (strlen($currentLine.' '.$word) <= $maxLineLength) {
-                if (! empty($currentLine)) {
-                    $currentLine .= ' ';
-                }
-                $currentLine .= $word;
-            } else {
-                $outputString .= $currentLine."\n";
-                $currentLine = $word;
-            }
-        }
-
-        if (! empty($currentLine)) {
-            $outputString .= $currentLine;
-        }
-
-        return $outputString;
-    }
-
     public static function parseNestedStringToArray($input): string
     {
         $result = [];
@@ -64,5 +31,38 @@ class Utils
         }
 
         return $result;
+    }
+
+    /**
+     * Wrap long lines of text to a specified maximum line length.
+     *
+     * @param  string  $inputString  The input string to be wrapped.
+     * @param  int  $maxLineLength  The maximum length of each line (default: 100).
+     * @return string The input string with newlines inserted as needed.
+     */
+    public static function wrapLongLines(string $inputString, int $maxLineLength = 100): string
+    {
+        $outputString = '';
+        $currentLine = '';
+
+        $words = explode(' ', $inputString);
+
+        foreach ($words as $word) {
+            if (strlen($currentLine . ' ' . $word) <= $maxLineLength) {
+                if (! empty($currentLine)) {
+                    $currentLine .= ' ';
+                }
+                $currentLine .= $word;
+            } else {
+                $outputString .= $currentLine . "\n";
+                $currentLine = $word;
+            }
+        }
+
+        if (! empty($currentLine)) {
+            $outputString .= $currentLine;
+        }
+
+        return $outputString;
     }
 }

@@ -18,21 +18,6 @@ class Factory
         'postman' => PostmanCollectionParser::class,
     ];
 
-    public static function getRegisteredParsers(): array
-    {
-        return self::$registeredParsers;
-    }
-
-    public static function getRegisteredParserTypes(): array
-    {
-        return array_keys(self::$registeredParsers);
-    }
-
-    public static function registerParser(string $name, string $className): void
-    {
-        self::$registeredParsers[$name] = $className;
-    }
-
     /**
      * @throws ParserNotRegisteredException
      */
@@ -52,11 +37,26 @@ class Factory
         throw new ParserNotRegisteredException("No parser registered for '$type'");
     }
 
+    public static function getRegisteredParsers(): array
+    {
+        return self::$registeredParsers;
+    }
+
+    public static function getRegisteredParserTypes(): array
+    {
+        return array_keys(self::$registeredParsers);
+    }
+
     /**
      * @throws ParserNotRegisteredException
      */
     public static function parse(string $type, mixed $input): ApiSpecification
     {
         return self::createParser($type, $input)->parse();
+    }
+
+    public static function registerParser(string $name, string $className): void
+    {
+        self::$registeredParsers[$name] = $className;
     }
 }

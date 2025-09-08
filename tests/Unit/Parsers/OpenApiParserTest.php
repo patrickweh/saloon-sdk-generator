@@ -4,7 +4,7 @@ use Crescat\SaloonSdkGenerator\Data\Generator\ApiKeyLocation;
 use Crescat\SaloonSdkGenerator\Data\Generator\SecuritySchemeType;
 use Crescat\SaloonSdkGenerator\Parsers\OpenApiParser;
 
-test('Parsed base url', function () {
+test('Parsed base url', function (): void {
     $specFile = sample_path('bigcommerce_abandoned_carts.v3.yml');
     $parser = OpenApiParser::build($specFile);
     $spec = $parser->parse();
@@ -16,8 +16,7 @@ test('Parsed base url', function () {
         ->and($spec->baseUrl->parameters[0]->description)->toBe('Permanent ID of the BigCommerce store.');
 });
 
-test('Parsed security requirements', function () {
-
+test('Parsed security requirements', function (): void {
     $specFile = sample_path('bigcommerce_abandoned_carts.v3.yml');
     $parser = OpenApiParser::build($specFile);
     $spec = $parser->parse();
@@ -26,8 +25,7 @@ test('Parsed security requirements', function () {
         ->and($spec->securityRequirements[0]->name)->toBe('X-Auth-Token');
 });
 
-test('Parsed security requirements using bearer token', function () {
-
+test('Parsed security requirements using bearer token', function (): void {
     $specFile = sample_path('kassalapp.json');
     $parser = OpenApiParser::build($specFile);
     $spec = $parser->parse();
@@ -40,8 +38,7 @@ test('Parsed security requirements using bearer token', function () {
         ->and($spec->securityRequirements[0]->name)->toBe('http');
 });
 
-test('Parsed components: security schemes', function () {
-
+test('Parsed components: security schemes', function (): void {
     $specFile = sample_path('bigcommerce_abandoned_carts.v3.yml');
     $parser = OpenApiParser::build($specFile);
     $spec = $parser->parse();

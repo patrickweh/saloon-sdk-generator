@@ -2,12 +2,10 @@
 
 use Crescat\SaloonSdkGenerator\Helpers\TemplateHelper;
 
-test('Render template', function ($template, $replace, $expected) {
-
+test('Render template', function ($template, $replace, $expected): void {
     $rendered = TemplateHelper::render($template, $replace);
 
     expect($rendered)->toBe($expected);
-
 })->with([
     ['This is a test', [], 'This is a test'],
     ['This is a {test}', ['test' => 'house'], 'This is a house'],

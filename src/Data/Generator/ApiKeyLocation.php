@@ -4,7 +4,7 @@ namespace Crescat\SaloonSdkGenerator\Data\Generator;
 
 enum ApiKeyLocation: string
 {
-    case query = 'query';
-    case header = 'header';
     case cookie = 'cookie';
+    case header = 'header';
+    case query = 'query';
 }

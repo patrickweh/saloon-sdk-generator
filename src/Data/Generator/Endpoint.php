@@ -24,8 +24,7 @@ class Endpoint
         public array $pathParameters = [],
         public array $bodyParameters = [],
         public array $headerParameters = [],
-    ) {
-    }
+    ) {}
 
     /**
      * @return Parameter[]

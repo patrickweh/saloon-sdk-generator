@@ -8,9 +8,9 @@ use LaravelZero\Framework\Commands\Command;
 
 class Convert extends Command
 {
-    protected $signature = 'convert {input} {output?}';
-
     protected $description = 'OpenAPI Only - Converts an old API spec to a newer version if possible with https://converter.swagger.io';
+
+    protected $signature = 'convert {input} {output?}';
 
     public function handle(): void
     {
@@ -33,7 +33,6 @@ class Convert extends Command
         }
 
         try {
-
             $this->comment('Starting conversion, please wait...');
             $output = OpenApiConverter::convert($content);
             $this->info('Converted successfully');
@@ -45,6 +44,5 @@ class Convert extends Command
 
             return;
         }
-
     }
 }

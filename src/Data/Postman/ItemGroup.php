@@ -11,13 +11,7 @@ class ItemGroup
         public ?string $name,
         public ?string $description,
         public array $item
-    ) {
-    }
-
-    public static function parseItem($item): ItemGroup|Item
-    {
-        return isset($item['item']) ? ItemGroup::fromJson($item) : Item::fromJson($item);
-    }
+    ) {}
 
     public static function fromJson(array $json): self
     {
@@ -26,7 +20,11 @@ class ItemGroup
             name: Arr::get($json, 'name'),
             description: Arr::get($json, 'description'),
             item: array_map(fn ($item) => ItemGroup::parseItem($item), $json['item'])
-
         );
+    }
+
+    public static function parseItem($item): ItemGroup|Item
+    {
+        return isset($item['item']) ? ItemGroup::fromJson($item) : Item::fromJson($item);
     }
 }

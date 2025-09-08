@@ -10,8 +10,7 @@ use Crescat\SaloonSdkGenerator\Data\Generator\Parameter;
 use Crescat\SaloonSdkGenerator\Data\Generator\ServerParameter;
 use Crescat\SaloonSdkGenerator\Generators\RequestGenerator;
 
-beforeEach(function () {
-
+beforeEach(function (): void {
     $this->generator = new RequestGenerator(new Config(
         connectorName: 'MyConnector',
         namespace: 'VendorName'
@@ -46,30 +45,29 @@ beforeEach(function () {
     );
 });
 
-test('Class properties', function () {
+test('Class properties', function (): void {
     $phpFiles = $this->generator->generate($this->dummySpec);
 
     $class = $phpFiles[0]->getNamespaces()['VendorName\Requests\Users']->getClasses()['GetUser'];
 
     $property = $class->getProperty('method');
 
-    expect($property)->toBeInstanceOf(\Nette\PhpGenerator\Property::class)
+    expect($property)->toBeInstanceOf(Nette\PhpGenerator\Property::class)
         ->and($property->getName())->toBe('method')
         ->and($property->getType())->toBe('Saloon\Enums\Method')
         ->and($property->getValue()->__toString())->toBe('Method::GET');
 });
 
-test('Constructor', closure: function () {
-
+test('Constructor', closure: function (): void {
     $phpFiles = $this->generator->generate($this->dummySpec);
 
     $class = $phpFiles[0]->getNamespaces()['VendorName\Requests\Users']->getClasses()['GetUser'];
 
     $constructor = $class->getMethods()['__construct'];
-    expect($constructor)->toBeInstanceOf(\Nette\PhpGenerator\Method::class)
+    expect($constructor)->toBeInstanceOf(Nette\PhpGenerator\Method::class)
         ->and($constructor->getParameters())->toHaveCount(2);
 
-    /** @var \Nette\PhpGenerator\PromotedParameter $channelIdParam */
+    /** @var Nette\PhpGenerator\PromotedParameter $channelIdParam */
     $channelIdParam = $constructor->getParameter('channelId');
     expect($channelIdParam->getName())->toBe('channelId')
         ->and($channelIdParam->getVisibility())->toBe('protected')
@@ -78,7 +76,7 @@ test('Constructor', closure: function () {
         ->and($channelIdParam->getDefaultValue())->toBeNull()
         ->and($channelIdParam->isNullable())->toBeTrue();
 
-    /** @var \Nette\PhpGenerator\PromotedParameter $channelIdParam */
+    /** @var Nette\PhpGenerator\PromotedParameter $channelIdParam */
     $userIdParam = $constructor->getParameter('userId');
     expect($userIdParam->getName())->toBe('userId')
         ->and($userIdParam->getType())->toBe('int')
@@ -86,26 +84,25 @@ test('Constructor', closure: function () {
         ->and($userIdParam->isNullable())->toBeFalse();
 });
 
-test('Resolve endpoint', function () {
+test('Resolve endpoint', function (): void {
     $phpFiles = $this->generator->generate($this->dummySpec);
 
     $class = $phpFiles[0]->getNamespaces()['VendorName\Requests\Users']->getClasses()['GetUser'];
     $resolveEndpoint = $class->getMethods()['resolveEndpoint'];
 
-    expect($resolveEndpoint)->toBeInstanceOf(\Nette\PhpGenerator\Method::class)
+    expect($resolveEndpoint)->toBeInstanceOf(Nette\PhpGenerator\Method::class)
         ->and($resolveEndpoint->getReturnType())->toBe('string')
         ->and($resolveEndpoint->getBody())->toBe("return \"/users/{\$this->userId}\";\n");
 });
 
-test('Default Query', function () {
+test('Default Query', function (): void {
     $phpFiles = $this->generator->generate($this->dummySpec);
 
     $class = $phpFiles[0]->getNamespaces()['VendorName\Requests\Users']->getClasses()['GetUser'];
     $defaultQuery = $class->getMethods()['defaultQuery'];
 
-    expect($defaultQuery)->toBeInstanceOf(\Nette\PhpGenerator\Method::class)
+    expect($defaultQuery)->toBeInstanceOf(Nette\PhpGenerator\Method::class)
         ->and($defaultQuery->getName())->toBe('defaultQuery')
         ->and($defaultQuery->getReturnType())->toBe('array')
         ->and($defaultQuery->getBody())->toBe("return array_filter(['channel_id' => \$this->channelId]);\n");
-
 });

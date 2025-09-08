@@ -15,14 +15,7 @@ class Body
         public ?array $graphql,
         public ?array $options,
         public bool $disabled,
-    ) {
-
-    }
-
-    public function rawAsJson(): ?array
-    {
-        return $this->raw ? json_decode($this->raw, true) : null;
-    }
+    ) {}
 
     public static function fromJson(array $json): self
     {
@@ -36,5 +29,10 @@ class Body
             options: Arr::get($json, 'options'),
             disabled: Arr::get($json, 'disabled', false),
         );
+    }
+
+    public function rawAsJson(): ?array
+    {
+        return $this->raw ? json_decode($this->raw, true) : null;
     }
 }

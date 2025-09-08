@@ -12,8 +12,7 @@ class Request
         public ?string $description = null,
         public ?array $header = null,
         public ?Body $body = null
-    ) {
-    }
+    ) {}
 
     public static function fromJson(string|array $json): self
     {
@@ -29,6 +28,5 @@ class Request
                 header: Arr::get($json, 'header'),
                 body: Arr::get($json, 'body') ? Body::fromJson(Arr::get($json, 'body')) : null,
             );
-
     }
 }

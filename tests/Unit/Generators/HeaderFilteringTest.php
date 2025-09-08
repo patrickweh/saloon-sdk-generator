@@ -8,12 +8,12 @@ use Crescat\SaloonSdkGenerator\Data\Generator\Method;
 use Crescat\SaloonSdkGenerator\Data\Generator\Parameter;
 use Crescat\SaloonSdkGenerator\Generators\RequestGenerator;
 
-it('filters out default ignored headers', function () {
+it('filters out default ignored headers', function (): void {
     $config = new Config(
         connectorName: 'TestConnector',
         namespace: 'TestNamespace'
     );
-    
+
     $endpoint = new Endpoint(
         name: 'TestRequest',
         method: Method::GET,
@@ -29,41 +29,41 @@ it('filters out default ignored headers', function () {
             new Parameter('string', false, 'X-API-Key'),
         ]
     );
-    
+
     $spec = new ApiSpecification(
         name: 'Test API',
         description: 'Test API',
         baseUrl: new BaseUrl('https://api.example.com'),
         endpoints: [$endpoint],
     );
-    
+
     $generator = new RequestGenerator($config);
     $files = $generator->generate($spec);
-    
+
     expect($files)->toHaveCount(1);
-    
+
     $requestFile = $files[0];
     $requestCode = (string) $requestFile;
-    
+
     // Should not include ignored headers
     expect($requestCode)->not->toContain('Authorization');
     expect($requestCode)->not->toContain('Content-Type');
     expect($requestCode)->not->toContain('Accept');
     expect($requestCode)->not->toContain('Accept-Language');
-    
+
     // Should include custom headers
     expect($requestCode)->toContain('X-Custom-Header');
     expect($requestCode)->toContain('X-API-Key');
     expect($requestCode)->toContain('defaultHeaders()');
 });
 
-it('allows custom header filtering configuration', function () {
+it('allows custom header filtering configuration', function (): void {
     $config = new Config(
         connectorName: 'TestConnector',
         namespace: 'TestNamespace',
         ignoredHeaderParams: ['X-Custom-Header', 'X-Internal-Header']
     );
-    
+
     $endpoint = new Endpoint(
         name: 'TestRequest',
         method: Method::GET,
@@ -77,37 +77,37 @@ it('allows custom header filtering configuration', function () {
             new Parameter('string', false, 'X-API-Key'),
         ]
     );
-    
+
     $spec = new ApiSpecification(
         name: 'Test API',
         description: 'Test API',
         baseUrl: new BaseUrl('https://api.example.com'),
         endpoints: [$endpoint],
     );
-    
+
     $generator = new RequestGenerator($config);
     $files = $generator->generate($spec);
-    
+
     expect($files)->toHaveCount(1);
-    
+
     $requestFile = $files[0];
     $requestCode = (string) $requestFile;
-    
+
     // Should not include custom ignored headers
     expect($requestCode)->not->toContain('X-Custom-Header');
     expect($requestCode)->not->toContain('X-Internal-Header');
-    
+
     // Should include non-ignored headers (even default ones if not in custom list)
     expect($requestCode)->toContain('Authorization');
     expect($requestCode)->toContain('X-API-Key');
 });
 
-it('handles endpoints with no headers gracefully', function () {
+it('handles endpoints with no headers gracefully', function (): void {
     $config = new Config(
         connectorName: 'TestConnector',
         namespace: 'TestNamespace'
     );
-    
+
     $endpoint = new Endpoint(
         name: 'TestRequest',
         method: Method::GET,
@@ -116,32 +116,32 @@ it('handles endpoints with no headers gracefully', function () {
         response: null,
         headerParameters: []
     );
-    
+
     $spec = new ApiSpecification(
         name: 'Test API',
         description: 'Test API',
         baseUrl: new BaseUrl('https://api.example.com'),
         endpoints: [$endpoint],
     );
-    
+
     $generator = new RequestGenerator($config);
     $files = $generator->generate($spec);
-    
+
     expect($files)->toHaveCount(1);
-    
+
     $requestFile = $files[0];
     $requestCode = (string) $requestFile;
-    
+
     // Should not have defaultHeaders method
     expect($requestCode)->not->toContain('defaultHeaders()');
 });
 
-it('generates proper header method with mixed parameters', function () {
+it('generates proper header method with mixed parameters', function (): void {
     $config = new Config(
         connectorName: 'TestConnector',
         namespace: 'TestNamespace'
     );
-    
+
     $endpoint = new Endpoint(
         name: 'TestRequest',
         method: Method::POST,
@@ -154,27 +154,27 @@ it('generates proper header method with mixed parameters', function () {
             new Parameter('int', false, 'X-Request-ID'),
         ]
     );
-    
+
     $spec = new ApiSpecification(
         name: 'Test API',
         description: 'Test API',
         baseUrl: new BaseUrl('https://api.example.com'),
         endpoints: [$endpoint],
     );
-    
+
     $generator = new RequestGenerator($config);
     $files = $generator->generate($spec);
-    
+
     expect($files)->toHaveCount(1);
-    
+
     $requestFile = $files[0];
     $requestCode = (string) $requestFile;
-    
+
     // Check constructor parameters
     expect($requestCode)->toContain('protected string $xApiKey');
     expect($requestCode)->toContain('protected ?string $xOptionalHeader = null');
     expect($requestCode)->toContain('protected int $xRequestId');
-    
+
     // Check defaultHeaders method
     expect($requestCode)->toContain('public function defaultHeaders(): array');
     expect($requestCode)->toContain("'X-API-Key' => \$this->xApiKey");

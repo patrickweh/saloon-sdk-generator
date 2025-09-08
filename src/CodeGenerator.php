@@ -8,6 +8,7 @@ use Crescat\SaloonSdkGenerator\Data\Generator\Config;
 use Crescat\SaloonSdkGenerator\Data\Generator\GeneratedCode;
 use Crescat\SaloonSdkGenerator\Generators\ConnectorGenerator;
 use Crescat\SaloonSdkGenerator\Generators\DtoGenerator;
+use Crescat\SaloonSdkGenerator\Generators\EnumGenerator;
 use Crescat\SaloonSdkGenerator\Generators\RequestGenerator;
 use Crescat\SaloonSdkGenerator\Generators\ResourceGenerator;
 
@@ -20,20 +21,26 @@ class CodeGenerator
         protected ?Generator $dtoGenerator = null,
         protected ?Generator $connectorGenerator = null,
         protected ?Generator $baseResourceGenerator = null,
+        protected ?Generator $enumGenerator = null,
     ) {
         $this->requestGenerator ??= new RequestGenerator($config);
         $this->resourceGenerator ??= new ResourceGenerator($config);
         $this->dtoGenerator ??= new DtoGenerator($config);
         $this->connectorGenerator ??= new ConnectorGenerator($config);
+        $this->enumGenerator ??= new EnumGenerator($config);
     }
 
     public function run(ApiSpecification $specification): GeneratedCode
     {
+        // Generate enums FIRST so that parameter enum names are updated
+        $enumClasses = $this->enumGenerator->generate($specification);
+
         return new GeneratedCode(
             requestClasses: $this->requestGenerator->generate($specification),
             resourceClasses: $this->resourceGenerator->generate($specification),
             dtoClasses: $this->dtoGenerator->generate($specification),
             connectorClass: $this->connectorGenerator->generate($specification),
+            enumClasses: $enumClasses,
         );
     }
 }

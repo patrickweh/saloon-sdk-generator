@@ -7,6 +7,7 @@ use Crescat\SaloonSdkGenerator\Data\Generator\Endpoint;
 use Crescat\SaloonSdkGenerator\Data\Generator\Parameter;
 use Crescat\SaloonSdkGenerator\Generator;
 use Crescat\SaloonSdkGenerator\Helpers\NameHelper;
+use Illuminate\Support\Str;
 use Nette\InvalidStateException;
 use Nette\PhpGenerator\ClassType;
 use Nette\PhpGenerator\Literal;
@@ -25,26 +26,6 @@ class ResourceGenerator extends Generator
     }
 
     /**
-     * @return array|PhpFile[]
-     */
-    protected function generateResourceClasses(ApiSpecification $specification): array
-    {
-        $classes = [];
-
-        $groupedByCollection = collect($specification->endpoints)->groupBy(function (Endpoint $endpoint) {
-            return NameHelper::resourceClassName(
-                $endpoint->collection ?: $this->config->fallbackResourceName
-            );
-        });
-
-        foreach ($groupedByCollection as $collection => $items) {
-            $classes[] = $this->generateResourceClass($collection, $items->toArray());
-        }
-
-        return $classes;
-    }
-
-    /**
      * @param  array|Endpoint[]  $endpoints
      */
     public function generateResourceClass(string $resourceName, array $endpoints): ?PhpFile
@@ -53,12 +34,13 @@ class ResourceGenerator extends Generator
 
         $classType->setExtends(BaseResource::class);
 
-        $classFile = new PhpFile;
+        $classFile = new PhpFile();
         $namespace = $classFile
             ->addNamespace("{$this->config->namespace}\\{$this->config->resourceNamespaceSuffix}")
             ->addUse(BaseResource::class);
 
         $duplicateCounter = 1;
+        $enumsToImport = [];
 
         foreach ($endpoints as $endpoint) {
             $requestClassName = NameHelper::resourceClassName($endpoint->name);
@@ -78,7 +60,7 @@ class ResourceGenerator extends Generator
             } catch (InvalidStateException $exception) {
                 // TODO: handle more gracefully in the future
                 $deduplicatedMethodName = NameHelper::safeVariableName(
-                    sprintf('%s%s', $methodName, 'Duplicate'.$duplicateCounter)
+                    sprintf('%s%s', $methodName, 'Duplicate' . $duplicateCounter)
                 );
                 $duplicateCounter++;
 
@@ -92,6 +74,22 @@ class ResourceGenerator extends Generator
             $method->setReturnType(Response::class);
 
             $args = [];
+
+            // Collect enum types from all parameters
+            $allParameters = array_merge(
+                $endpoint->pathParameters,
+                $endpoint->bodyParameters,
+                $endpoint->queryParameters,
+                $endpoint->headerParameters
+            );
+
+            foreach ($allParameters as $parameter) {
+                if ($parameter->hasEnum()) {
+                    $enumClass = Str::studly($parameter->enumName);
+                    $enumFQN = "{$this->config->namespace}\\Enums\\{$enumClass}";
+                    $enumsToImport[$enumFQN] = $enumClass;
+                }
+            }
 
             foreach ($endpoint->pathParameters as $parameter) {
                 $this->addPropertyToMethod($method, $parameter);
@@ -123,7 +121,11 @@ class ResourceGenerator extends Generator
             $method->setBody(
                 new Literal(sprintf('return $this->connector->send(new %s(%s));', $requestClassNameAlias ?? $requestClassName, implode(', ', $args)))
             );
+        }
 
+        // Import all collected enum types
+        foreach ($enumsToImport as $enumFQN => $enumClass) {
+            $namespace->addUse($enumFQN);
         }
 
         $namespace->add($classType);
@@ -135,19 +137,33 @@ class ResourceGenerator extends Generator
     {
         $name = NameHelper::safeVariableName($parameter->name);
 
+        // Determine the type to use
+        $type = $parameter->type;
+        $docType = $parameter->type;
+
+        // If this parameter has an enum, we need to use the full namespace for now
+        // Then the import will make it work correctly
+        if ($parameter->hasEnum()) {
+            $enumClass = Str::studly($parameter->enumName);
+            // Use the full namespace for the type, which will be resolved to the short name
+            // because we're importing it
+            $type = $this->config->namespace . '\\Enums\\' . $enumClass;
+            $docType = $enumClass;
+        }
+
         $param = $method
             ->addComment(
                 trim(
                     sprintf(
                         '@param %s $%s %s',
-                        $parameter->type,
+                        $parameter->nullable ? "null|{$docType}" : $docType,
                         $name,
                         $parameter->description
                     )
                 )
             )
             ->addParameter($name)
-            ->setType($parameter->type)
+            ->setType($type)
             ->setNullable($parameter->nullable);
 
         if ($parameter->nullable) {
@@ -155,6 +171,26 @@ class ResourceGenerator extends Generator
         }
 
         return $method;
+    }
+
+    /**
+     * @return array|PhpFile[]
+     */
+    protected function generateResourceClasses(ApiSpecification $specification): array
+    {
+        $classes = [];
+
+        $groupedByCollection = collect($specification->endpoints)->groupBy(function (Endpoint $endpoint) {
+            return NameHelper::resourceClassName(
+                $endpoint->collection ?: $this->config->fallbackResourceName
+            );
+        });
+
+        foreach ($groupedByCollection as $collection => $items) {
+            $classes[] = $this->generateResourceClass($collection, $items->toArray());
+        }
+
+        return $classes;
     }
 
     protected function recordDuplicatedRequestName(string $requestClassName, string $deduplicatedMethodName): void

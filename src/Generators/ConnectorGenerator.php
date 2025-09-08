@@ -25,6 +25,7 @@ use Saloon\Http\Auth\MultiAuthenticator;
 use Saloon\Http\Auth\QueryAuthenticator;
 use Saloon\Http\Auth\TokenAuthenticator;
 use Saloon\Http\Connector;
+use Saloon\Traits\Makeable;
 use Saloon\Traits\OAuth2\AuthorizationCodeGrant;
 use Saloon\Traits\OAuth2\ClientCredentialsGrant;
 use SensitiveParameter;
@@ -36,214 +37,11 @@ class ConnectorGenerator extends Generator
         return $this->generateConnectorClass($specification);
     }
 
-    protected function generateConnectorClass(ApiSpecification $specification): ?PhpFile
-    {
-
-        $classType = new ClassType($this->config->connectorName);
-        $classType->setExtends(Connector::class);
-
-        if ($specification->name) {
-            $classType->addComment($specification->name);
-        }
-
-        if ($specification->description) {
-            $classType->addComment($specification->name ? "\n{$specification->description}" : $specification->description);
-        }
-
-        $classFile = new PhpFile();
-
-        $this->addConstructor($classType, $specification);
-        $this->addResolveBaseUrlMethod($classType, $specification);
-
-        $namespace = $classFile
-            ->addNamespace("{$this->config->namespace}")
-            ->addUse(Connector::class);
-
-        $this->addAuthenticators($namespace, $classType, $specification);
-        $this->addMethodsForResources($namespace, $classType, $specification);
-
-        $namespace->add($classType);
-
-        return $classFile;
-    }
-
-    protected function addConstructor(
-        ClassType $classType,
-        ApiSpecification $specification
-    ): ClassType {
-        $classConstructor = $classType->addMethod('__construct');
-
-        // Add Base Url Property
-        foreach ($specification->baseUrl->parameters as $parameter) {
-            MethodGeneratorHelper::addParameterAsPromotedProperty(
-                $classConstructor,
-                new Parameter(
-                    type: 'string',
-                    nullable: false,
-                    name: $parameter->name,
-                    description: $parameter->description
-                )
-            );
-        }
-
-        // TODO: split into multiple methods
-
-        // Add api tokens and other auth parameters as properties on the constructor.
-        foreach ($specification->components->securitySchemes ?? [] as $securityScheme) {
-            if ($securityScheme->type === SecuritySchemeType::apiKey) {
-                // TODO: Refactor
-                $name = NameHelper::safeVariableName(preg_replace('/^X-/', '', $securityScheme->name));
-                MethodGeneratorHelper::addParameterAsPromotedProperty(
-                    $classConstructor,
-                    new Parameter(type: 'string', nullable: false, name: $name, description: $securityScheme->description)
-                );
-            }
-
-            if ($securityScheme->type === SecuritySchemeType::http) {
-
-                if ($securityScheme->scheme === 'bearer') {
-                    MethodGeneratorHelper::addParameterAsPromotedProperty(
-                        $classConstructor,
-                        new Parameter(type: 'string', nullable: false, name: 'bearerToken', description: $securityScheme->description)
-                    );
-
-                    continue;
-                }
-
-                if ($securityScheme->scheme === 'basic' || $securityScheme->scheme === 'digest') {
-                    MethodGeneratorHelper::addParameterAsPromotedProperty(
-                        $classConstructor,
-                        new Parameter(type: 'string', nullable: false, name: 'username', description: $securityScheme->description)
-                    );
-                    MethodGeneratorHelper::addParameterAsPromotedProperty(
-                        $classConstructor,
-                        new Parameter(type: 'string', nullable: false, name: 'password', description: $securityScheme->description)
-                    );
-
-                    continue;
-                }
-
-                MethodGeneratorHelper::addParameterAsPromotedProperty(
-                    $classConstructor,
-                    new Parameter(type: 'string', nullable: false, name: 'token', description: $securityScheme->description)
-                );
-            }
-
-            if ($securityScheme->type === SecuritySchemeType::oauth2) {
-                if ($securityScheme->flows->authorizationCode !== null) {
-
-                    MethodGeneratorHelper::addParameterAsPromotedProperty(
-                        $classConstructor,
-                        new Parameter(type: 'string', nullable: false, name: 'clientId'),
-                        sensitive: true
-                    );
-
-                    MethodGeneratorHelper::addParameterAsPromotedProperty(
-                        $classConstructor,
-                        new Parameter(type: 'string', nullable: false, name: 'clientSecret'),
-                        sensitive: true
-                    );
-                    MethodGeneratorHelper::addParameterAsPromotedProperty(
-                        $classConstructor,
-                        new Parameter(type: 'string', nullable: true, name: 'authorizationUrl'),
-                        $securityScheme->flows->authorizationCode->authorizationUrl ?? null
-
-                    );
-                    MethodGeneratorHelper::addParameterAsPromotedProperty(
-                        $classConstructor,
-                        new Parameter(type: 'string', nullable: true, name: 'tokenUrl'),
-                        $securityScheme->flows->authorizationCode->tokenUrl ?? null
-
-                    );
-                    MethodGeneratorHelper::addParameterAsPromotedProperty(
-                        $classConstructor,
-                        new Parameter(type: 'string', nullable: true, name: 'refreshUrl'),
-                        $securityScheme->flows->authorizationCode->refreshUrl ?? null
-
-                    );
-
-                    MethodGeneratorHelper::addParameterAsPromotedProperty(
-                        $classConstructor,
-                        new Parameter(type: 'array', nullable: true, name: 'scopes'),
-                        $securityScheme->flows->authorizationCode->scopes ?? []
-                    );
-                }
-
-                if ($securityScheme->flows->clientCredentials !== null) {
-                    MethodGeneratorHelper::addParameterAsPromotedProperty(
-                        $classConstructor,
-                        new Parameter(type: 'string', nullable: false, name: 'clientId'),
-                        sensitive: true
-                    );
-
-                    MethodGeneratorHelper::addParameterAsPromotedProperty(
-                        $classConstructor,
-                        new Parameter(type: 'string', nullable: false, name: 'clientSecret'),
-                        sensitive: true
-                    );
-
-                    MethodGeneratorHelper::addParameterAsPromotedProperty(
-                        $classConstructor,
-                        new Parameter(type: 'string', nullable: true, name: 'tokenUrl'),
-                        $securityScheme->flows->clientCredentials->tokenUrl ?? null
-
-                    );
-                    MethodGeneratorHelper::addParameterAsPromotedProperty(
-                        $classConstructor,
-                        new Parameter(type: 'string', nullable: true, name: 'refreshUrl'),
-                        $securityScheme->flows->clientCredentials->refreshUrl ?? null
-
-                    );
-
-                    MethodGeneratorHelper::addParameterAsPromotedProperty(
-                        $classConstructor,
-                        new Parameter(type: 'array', nullable: true, name: 'scopes'),
-                        $securityScheme->flows->clientCredentials->scopes ?? []
-                    );
-                }
-
-                // TODO: Support password grant and other types later.
-            }
-
-            if ($securityScheme->type === SecuritySchemeType::mutualTLS) {
-                MethodGeneratorHelper::addParameterAsPromotedProperty(
-                    $classConstructor,
-                    new Parameter(type: 'string', nullable: false, name: 'certPath'),
-                );
-
-                MethodGeneratorHelper::addParameterAsPromotedProperty(
-                    $classConstructor,
-                    new Parameter(type: 'string', nullable: true, name: 'certPassword'),
-                    sensitive: true
-                );
-            }
-        }
-
-        return $classType;
-    }
-
-    protected function addResolveBaseUrlMethod(ClassType $classType, ApiSpecification $specification): ClassType
-    {
-        $params = [];
-        foreach ($specification->baseUrl->parameters as $parameter) {
-            $params[$parameter->name] = sprintf('{$this->%s}', NameHelper::safeVariableName($parameter->name));
-        }
-        $baseUrlWithParams = TemplateHelper::render($specification->baseUrl->url ?? 'TODO', $params);
-
-        $classType->addMethod('resolveBaseUrl')
-            ->setReturnType('string')
-            ->setBody(new Literal(sprintf('return "%s";', $baseUrlWithParams)));
-
-        return $classType;
-    }
-
     protected function addAuthenticators(
         PhpNamespace $namespace,
         ClassType $classType,
         ApiSpecification $specification
-
     ): ClassType {
-
         $authenticators = [];
 
         foreach ($specification->components->securitySchemes ?? [] as $securityScheme) {
@@ -293,7 +91,6 @@ class ConnectorGenerator extends Generator
             }
 
             if ($securityScheme->type === SecuritySchemeType::oauth2) {
-
                 $namespace
                     ->addUse(OAuthConfig::class)
                     ->addUse(SensitiveParameter::class);
@@ -317,7 +114,6 @@ class ConnectorGenerator extends Generator
                                 ])
                             )
                         );
-
                 }
 
                 if ($securityScheme->flows->clientCredentials !== null) {
@@ -335,7 +131,6 @@ class ConnectorGenerator extends Generator
                                     '->setDefaultScopes($this->scopes)',
                                     '->setTokenEndpoint($this->tokenUrl);',
                                 ])
-
                             )
                         );
                 }
@@ -372,6 +167,154 @@ class ConnectorGenerator extends Generator
         return $classType;
     }
 
+    protected function addConstructor(
+        ClassType $classType,
+        ApiSpecification $specification
+    ): ClassType {
+        $classConstructor = $classType->addMethod('__construct');
+
+        // Add Base Url Property
+        foreach ($specification->baseUrl->parameters as $parameter) {
+            MethodGeneratorHelper::addParameterAsPromotedProperty(
+                $classConstructor,
+                new Parameter(
+                    type: 'string',
+                    nullable: false,
+                    name: $parameter->name,
+                    description: $parameter->description
+                )
+            );
+        }
+
+        // TODO: split into multiple methods
+
+        // Add api tokens and other auth parameters as properties on the constructor.
+        foreach ($specification->components->securitySchemes ?? [] as $securityScheme) {
+            if ($securityScheme->type === SecuritySchemeType::apiKey) {
+                // TODO: Refactor
+                $name = NameHelper::safeVariableName(preg_replace('/^X-/', '', $securityScheme->name));
+                MethodGeneratorHelper::addParameterAsPromotedProperty(
+                    $classConstructor,
+                    new Parameter(type: 'string', nullable: false, name: $name, description: $securityScheme->description)
+                );
+            }
+
+            if ($securityScheme->type === SecuritySchemeType::http) {
+                if ($securityScheme->scheme === 'bearer') {
+                    MethodGeneratorHelper::addParameterAsPromotedProperty(
+                        $classConstructor,
+                        new Parameter(type: 'string', nullable: false, name: 'bearerToken', description: $securityScheme->description)
+                    );
+
+                    continue;
+                }
+
+                if ($securityScheme->scheme === 'basic' || $securityScheme->scheme === 'digest') {
+                    MethodGeneratorHelper::addParameterAsPromotedProperty(
+                        $classConstructor,
+                        new Parameter(type: 'string', nullable: false, name: 'username', description: $securityScheme->description)
+                    );
+                    MethodGeneratorHelper::addParameterAsPromotedProperty(
+                        $classConstructor,
+                        new Parameter(type: 'string', nullable: false, name: 'password', description: $securityScheme->description)
+                    );
+
+                    continue;
+                }
+
+                MethodGeneratorHelper::addParameterAsPromotedProperty(
+                    $classConstructor,
+                    new Parameter(type: 'string', nullable: false, name: 'token', description: $securityScheme->description)
+                );
+            }
+
+            if ($securityScheme->type === SecuritySchemeType::oauth2) {
+                if ($securityScheme->flows->authorizationCode !== null) {
+                    MethodGeneratorHelper::addParameterAsPromotedProperty(
+                        $classConstructor,
+                        new Parameter(type: 'string', nullable: false, name: 'clientId'),
+                        sensitive: true
+                    );
+
+                    MethodGeneratorHelper::addParameterAsPromotedProperty(
+                        $classConstructor,
+                        new Parameter(type: 'string', nullable: false, name: 'clientSecret'),
+                        sensitive: true
+                    );
+                    MethodGeneratorHelper::addParameterAsPromotedProperty(
+                        $classConstructor,
+                        new Parameter(type: 'string', nullable: true, name: 'authorizationUrl'),
+                        $securityScheme->flows->authorizationCode->authorizationUrl ?? null
+                    );
+                    MethodGeneratorHelper::addParameterAsPromotedProperty(
+                        $classConstructor,
+                        new Parameter(type: 'string', nullable: true, name: 'tokenUrl'),
+                        $securityScheme->flows->authorizationCode->tokenUrl ?? null
+                    );
+                    MethodGeneratorHelper::addParameterAsPromotedProperty(
+                        $classConstructor,
+                        new Parameter(type: 'string', nullable: true, name: 'refreshUrl'),
+                        $securityScheme->flows->authorizationCode->refreshUrl ?? null
+                    );
+
+                    MethodGeneratorHelper::addParameterAsPromotedProperty(
+                        $classConstructor,
+                        new Parameter(type: 'array', nullable: true, name: 'scopes'),
+                        $securityScheme->flows->authorizationCode->scopes ?? []
+                    );
+                }
+
+                if ($securityScheme->flows->clientCredentials !== null) {
+                    MethodGeneratorHelper::addParameterAsPromotedProperty(
+                        $classConstructor,
+                        new Parameter(type: 'string', nullable: false, name: 'clientId'),
+                        sensitive: true
+                    );
+
+                    MethodGeneratorHelper::addParameterAsPromotedProperty(
+                        $classConstructor,
+                        new Parameter(type: 'string', nullable: false, name: 'clientSecret'),
+                        sensitive: true
+                    );
+
+                    MethodGeneratorHelper::addParameterAsPromotedProperty(
+                        $classConstructor,
+                        new Parameter(type: 'string', nullable: true, name: 'tokenUrl'),
+                        $securityScheme->flows->clientCredentials->tokenUrl ?? null
+                    );
+                    MethodGeneratorHelper::addParameterAsPromotedProperty(
+                        $classConstructor,
+                        new Parameter(type: 'string', nullable: true, name: 'refreshUrl'),
+                        $securityScheme->flows->clientCredentials->refreshUrl ?? null
+                    );
+
+                    MethodGeneratorHelper::addParameterAsPromotedProperty(
+                        $classConstructor,
+                        new Parameter(type: 'array', nullable: true, name: 'scopes'),
+                        $securityScheme->flows->clientCredentials->scopes ?? []
+                    );
+                }
+
+                // TODO: Support password grant and other types later.
+            }
+
+            if ($securityScheme->type === SecuritySchemeType::mutualTLS) {
+                MethodGeneratorHelper::addParameterAsPromotedProperty(
+                    $classConstructor,
+                    new Parameter(type: 'string', nullable: false, name: 'certPath'),
+                );
+
+                MethodGeneratorHelper::addParameterAsPromotedProperty(
+                    $classConstructor,
+                    new Parameter(type: 'string', nullable: true, name: 'certPassword'),
+                    sensitive: true
+                );
+            }
+        }
+
+        return $classType;
+    }
+
     protected function addMethodsForResources(
         PhpNamespace $namespace,
         ClassType $classType,
@@ -400,9 +343,55 @@ class ConnectorGenerator extends Generator
                 ->setBody(
                     new Literal(sprintf('return new %s($this);', $resourceClassName))
                 );
-
         }
 
         return $classType;
+    }
+
+    protected function addResolveBaseUrlMethod(ClassType $classType, ApiSpecification $specification): ClassType
+    {
+        $params = [];
+        foreach ($specification->baseUrl->parameters as $parameter) {
+            $params[$parameter->name] = sprintf('{$this->%s}', NameHelper::safeVariableName($parameter->name));
+        }
+        $baseUrlWithParams = TemplateHelper::render($specification->baseUrl->url ?? 'TODO', $params);
+
+        $classType->addMethod('resolveBaseUrl')
+            ->setReturnType('string')
+            ->setBody(new Literal(sprintf('return "%s";', $baseUrlWithParams)));
+
+        return $classType;
+    }
+
+    protected function generateConnectorClass(ApiSpecification $specification): ?PhpFile
+    {
+        $classType = new ClassType($this->config->connectorName);
+        $classType->setExtends(Connector::class);
+        $classType->addTrait(Makeable::class);
+
+        if ($specification->name) {
+            $classType->addComment($specification->name);
+        }
+
+        if ($specification->description) {
+            $classType->addComment($specification->name ? "\n{$specification->description}" : $specification->description);
+        }
+
+        $classFile = new PhpFile();
+
+        $this->addConstructor($classType, $specification);
+        $this->addResolveBaseUrlMethod($classType, $specification);
+
+        $namespace = $classFile
+            ->addNamespace("{$this->config->namespace}")
+            ->addUse(Connector::class)
+            ->addUse(Makeable::class);
+
+        $this->addAuthenticators($namespace, $classType, $specification);
+        $this->addMethodsForResources($namespace, $classType, $specification);
+
+        $namespace->add($classType);
+
+        return $classFile;
     }
 }

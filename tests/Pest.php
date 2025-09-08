@@ -15,5 +15,5 @@ uses(Tests\TestCase::class)->in('Feature');
 
 function sample_path(string $path): string
 {
-    return realpath(__DIR__.'/Samples/'.$path);
+    return realpath(__DIR__ . '/Samples/' . $path);
 }

@@ -4,7 +4,6 @@ use Crescat\SaloonSdkGenerator\Commands\Convert;
 use Crescat\SaloonSdkGenerator\Commands\GenerateSdk;
 
 return [
-
     /*
     |--------------------------------------------------------------------------
     | Default Command
@@ -83,5 +82,4 @@ return [
     'remove' => [
         // ..
     ],
-
 ];

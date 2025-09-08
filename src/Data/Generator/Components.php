@@ -22,6 +22,5 @@ class Components
         public readonly array $links = [],
         public readonly array $callbacks = [],
         public readonly array $pathItems = []
-    ) {
-    }
+    ) {}
 }

@@ -8,12 +8,12 @@ use Crescat\SaloonSdkGenerator\Data\Generator\Method;
 use Crescat\SaloonSdkGenerator\Data\Generator\Parameter;
 use Crescat\SaloonSdkGenerator\Generators\ResourceGenerator;
 
-it('generates resource methods with nullable parameters having default values', function () {
+it('generates resource methods with nullable parameters having default values', function (): void {
     $config = new Config(
         connectorName: 'TestConnector',
         namespace: 'TestNamespace'
     );
-    
+
     $endpoint = new Endpoint(
         name: 'GetUser',
         method: Method::GET,
@@ -30,37 +30,37 @@ it('generates resource methods with nullable parameters having default values', 
             new Parameter('string', false, 'id', 'User ID'),
         ],
     );
-    
+
     $spec = new ApiSpecification(
         name: 'Test API',
         description: 'Test API',
         baseUrl: new BaseUrl('https://api.example.com'),
         endpoints: [$endpoint],
     );
-    
+
     $generator = new ResourceGenerator($config);
     $files = $generator->generate($spec);
-    
+
     expect($files)->toHaveCount(1);
-    
+
     $resourceFile = $files[0];
     $resourceCode = (string) $resourceFile;
-    
+
     // Check that the method signature has nullable parameters with default values
     expect($resourceCode)->toContain('public function getUser(string $id, ?string $include = null, ?bool $active = null)');
-    
+
     // Check the PHPDoc comments
     expect($resourceCode)->toContain('@param string $id User ID');
     expect($resourceCode)->toContain('@param string $include Include related data');
     expect($resourceCode)->toContain('@param bool $active Filter by active status');
 });
 
-it('generates resource methods with required parameters without default values', function () {
+it('generates resource methods with required parameters without default values', function (): void {
     $config = new Config(
         connectorName: 'TestConnector',
         namespace: 'TestNamespace'
     );
-    
+
     $endpoint = new Endpoint(
         name: 'CreateUser',
         method: Method::POST,
@@ -74,33 +74,33 @@ it('generates resource methods with required parameters without default values',
             new Parameter('string', true, 'phone', 'User phone'),
         ],
     );
-    
+
     $spec = new ApiSpecification(
         name: 'Test API',
         description: 'Test API',
         baseUrl: new BaseUrl('https://api.example.com'),
         endpoints: [$endpoint],
     );
-    
+
     $generator = new ResourceGenerator($config);
     $files = $generator->generate($spec);
-    
+
     expect($files)->toHaveCount(1);
-    
+
     $resourceFile = $files[0];
     $resourceCode = (string) $resourceFile;
-    
+
     // Check that required parameters don't have default values
     expect($resourceCode)->toContain('public function createUser(string $name, string $email, ?string $phone = null)');
 });
 
-it('respects ignored query parameters in resource methods', function () {
+it('respects ignored query parameters in resource methods', function (): void {
     $config = new Config(
         connectorName: 'TestConnector',
         namespace: 'TestNamespace',
         ignoredQueryParams: ['per_page', 'page']
     );
-    
+
     $endpoint = new Endpoint(
         name: 'ListUsers',
         method: Method::GET,
@@ -114,24 +114,24 @@ it('respects ignored query parameters in resource methods', function () {
             new Parameter('string', true, 'sort', 'Sort field'),
         ],
     );
-    
+
     $spec = new ApiSpecification(
         name: 'Test API',
         description: 'Test API',
         baseUrl: new BaseUrl('https://api.example.com'),
         endpoints: [$endpoint],
     );
-    
+
     $generator = new ResourceGenerator($config);
     $files = $generator->generate($spec);
-    
+
     $resourceFile = $files[0];
     $resourceCode = (string) $resourceFile;
-    
+
     // Should include non-ignored parameters
     expect($resourceCode)->toContain('?string $search = null');
     expect($resourceCode)->toContain('?string $sort = null');
-    
+
     // Should not include ignored parameters
     expect($resourceCode)->not->toContain('per_page');
     expect($resourceCode)->not->toContain('page');

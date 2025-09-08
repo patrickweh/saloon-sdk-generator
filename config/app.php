@@ -3,7 +3,6 @@
 use Crescat\SaloonSdkGenerator\Providers\AppServiceProvider;
 
 return [
-
     /*
     |--------------------------------------------------------------------------
     | Application Name
@@ -71,5 +70,4 @@ return [
     'providers' => [
         AppServiceProvider::class,
     ],
-
 ];
