@@ -134,7 +134,18 @@ class NameHelper
 
     public static function requestClassName(string $value): string
     {
-        return self::safeClassName($value, 'Request');
+        // Remove common HTTP method prefixes from the name
+        $httpMethods = ['get_', 'post_', 'put_', 'patch_', 'delete_', 'head_', 'options_'];
+        $cleanValue = $value;
+        
+        foreach ($httpMethods as $method) {
+            if (str_starts_with(strtolower($value), $method)) {
+                $cleanValue = substr($value, strlen($method));
+                break;
+            }
+        }
+        
+        return self::safeClassName($cleanValue, 'Request');
     }
 
     public static function resourceClassName(string $value): string

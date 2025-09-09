@@ -19,6 +19,7 @@ class Endpoint
         public ?array $response,
 
         public ?string $description = null,
+        public ?string $contentType = null,
 
         public array $queryParameters = [],
         public array $pathParameters = [],

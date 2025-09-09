@@ -173,12 +173,22 @@ class OpenApiParser implements Parser
     {
         // Parse body parameters from requestBody
         $bodyParameters = [];
+        $contentType = null;
+        
         if ($operation->requestBody && $operation->requestBody->content) {
-            // Check for JSON or form-encoded content
-            $content = $operation->requestBody->content['application/json']
-                ?? $operation->requestBody->content['application/x-www-form-urlencoded']
-                ?? $operation->requestBody->content['multipart/form-data']
-                ?? null;
+            // Determine content type
+            if (isset($operation->requestBody->content['application/json'])) {
+                $contentType = 'application/json';
+                $content = $operation->requestBody->content['application/json'];
+            } elseif (isset($operation->requestBody->content['application/x-www-form-urlencoded'])) {
+                $contentType = 'application/x-www-form-urlencoded';
+                $content = $operation->requestBody->content['application/x-www-form-urlencoded'];
+            } elseif (isset($operation->requestBody->content['multipart/form-data'])) {
+                $contentType = 'multipart/form-data';
+                $content = $operation->requestBody->content['multipart/form-data'];
+            } else {
+                $content = null;
+            }
 
             if ($content && isset($content->schema)) {
                 $bodyParameters = $this->parseSchemaToParameters($content->schema);
@@ -201,9 +211,10 @@ class OpenApiParser implements Parser
             name: trim($operation->operationId ?: $operation->summary ?: ''),
             method: Method::parse($methodName),
             pathSegments: Str::of($path)->replace('{', ':')->remove('}')->trim('/')->explode('/')->toArray(),
-            collection: $operation->tags[0] ?? null, // In the real-world, people USUALLY only use one tag...
+            collection: $this->determineCollection($path, $operation->tags[0] ?? null),
             response: $responseInfo,
             description: $operation->description,
+            contentType: $contentType,
             queryParameters: $this->mapParams($operation->parameters ?? [], 'query'),
             // TODO: Check if this differs between spec versions
             pathParameters: $pathParams + $this->mapParams($operation->parameters ?? [], 'path'),
@@ -235,6 +246,65 @@ class OpenApiParser implements Parser
         return $requests;
     }
 
+    /**
+     * Determine the collection based on the path and tag
+     */
+    protected function determineCollection(string $path, ?string $tag): ?string
+    {
+        // Extract the first segment of the path
+        $segments = explode('/', trim($path, '/'));
+        $firstSegment = $segments[0] ?? null;
+        
+        if (!$firstSegment) {
+            return $tag;
+        }
+        
+        // Map path prefixes to better collection names
+        $pathMapping = [
+            'dns' => 'Dns',
+            'domain' => 'Domains',
+            'handle' => 'Handles',
+            'mail' => 'Emails',
+            'user' => 'Users',
+            'auth' => 'Auth',
+            'webspace' => 'Webspaces',
+            'tls' => 'Ssl',
+            'reseller' => 'Resellers',
+            'billing' => 'Billing',
+            'invoice' => 'Invoices',
+            'payment' => 'Payments',
+            'rights' => 'Rights',
+            'setting' => 'Settings',
+            'batch' => 'Batch',
+            'ticket' => 'Tickets',
+            'maintenance' => 'Maintenance',
+            'flexdns' => 'FlexDns',
+            'gdpr' => 'Gdpr',
+            'pgp' => 'Pgp',
+            'vns' => 'Vns',
+            'ens' => 'Ens',
+            'tld' => 'Tlds',
+            'stats' => 'Statistics',
+            'prices' => 'Prices',
+            'product' => 'Products',
+            'affiliate' => 'Affiliates',
+            'resellerPrices' => 'ResellerPrices',
+            'file' => 'Files',
+            'log' => 'Logs',
+            'messageQueue' => 'MessageQueue',
+            'domainContent' => 'DomainContent',
+            'domainParking' => 'DomainParking',
+        ];
+        
+        // Check if we have a specific mapping for this path prefix
+        if (isset($pathMapping[$firstSegment])) {
+            return $pathMapping[$firstSegment];
+        }
+        
+        // Otherwise use the tag or capitalize the first segment
+        return $tag ?: ucfirst($firstSegment);
+    }
+    
     protected function parseResponseSchema($schema): ?array
     {
         // Handle schema references
@@ -251,9 +321,54 @@ class OpenApiParser implements Parser
             }
         }
 
-        // For inline schemas, check if it has properties that could be a DTO
+        // For inline schemas, detect DTOs from property names
         if ($schema && isset($schema->properties)) {
-            // Generate a DTO name based on the endpoint (this will be handled by RequestGenerator)
+            // Map common response properties to their DTO classes
+            $dtoMappings = [
+                'domain' => 'Domain',
+                'domains' => ['type' => 'array', 'dto_class' => 'Domain'],
+                'user' => 'User',
+                'users' => ['type' => 'array', 'dto_class' => 'User'],
+                'reseller' => 'Reseller',
+                'resellers' => ['type' => 'array', 'dto_class' => 'Reseller'],
+                'webspace' => 'Webspace',
+                'webspaces' => ['type' => 'array', 'dto_class' => 'Webspace'],
+                'invoice' => 'Invoice',
+                'invoices' => ['type' => 'array', 'dto_class' => 'Invoice'],
+                'order' => 'Order',
+                'orders' => ['type' => 'array', 'dto_class' => 'Order'],
+                'tls' => 'Tls',
+                'tlsCertificate' => 'TlsCertificate',
+                'tlsCertificates' => ['type' => 'array', 'dto_class' => 'Tls'],
+                'mail' => 'EmailAddress',
+                'mails' => ['type' => 'array', 'dto_class' => 'EmailAddress'],
+                'emailAddress' => 'EmailAddress',
+                'emailAddresses' => ['type' => 'array', 'dto_class' => 'EmailAddress'],
+                'handle' => 'Handle',
+                'handles' => ['type' => 'array', 'dto_class' => 'Handle'],
+                'ticket' => 'Ticket',
+                'tickets' => ['type' => 'array', 'dto_class' => 'Ticket'],
+                'batch' => 'BatchProcessing',
+                'batches' => ['type' => 'array', 'dto_class' => 'BatchProcessing'],
+                'pushRequest' => 'PushRequest',
+                'pushRequests' => ['type' => 'array', 'dto_class' => 'PushRequest'],
+            ];
+            
+            // Check each property to see if it maps to a DTO
+            foreach ($schema->properties as $propName => $propSchema) {
+                if (isset($dtoMappings[$propName])) {
+                    $mapping = $dtoMappings[$propName];
+                    if (is_array($mapping)) {
+                        return $mapping;
+                    }
+                    return [
+                        'type' => 'dto',
+                        'dto_class' => $mapping,
+                    ];
+                }
+            }
+            
+            // For inline schemas that don't match known patterns, return as inline
             return [
                 'type' => 'inline',
                 'schema' => $schema,
@@ -271,6 +386,25 @@ class OpenApiParser implements Parser
                         'type' => 'array',
                         'dto_class' => $schemaName,
                     ];
+                }
+            }
+            
+            // For direct array responses (like domain/list that returns array of domains)
+            // Check if this is likely a list endpoint that should return DTOs
+            // This is a bit of a hack but necessary for APIs that return arrays directly
+            if ($schema->items && isset($schema->items->properties)) {
+                // Check if the items have properties that look like a DTO
+                foreach ($dtoMappings as $propName => $dtoClass) {
+                    if (isset($schema->items->properties->$propName)) {
+                        // Found a property that matches a DTO pattern
+                        // Determine the DTO based on the property
+                        if (is_array($dtoClass) && isset($dtoClass['dto_class'])) {
+                            return [
+                                'type' => 'array',
+                                'dto_class' => $dtoClass['dto_class'],
+                            ];
+                        }
+                    }
                 }
             }
         }

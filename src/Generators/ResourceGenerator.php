@@ -37,13 +37,15 @@ class ResourceGenerator extends Generator
         $classFile = new PhpFile();
         $namespace = $classFile
             ->addNamespace("{$this->config->namespace}\\{$this->config->resourceNamespaceSuffix}")
-            ->addUse(BaseResource::class);
+            ->addUse(BaseResource::class)
+            ->addUse('Saloon\\Exceptions\\Request\\FatalRequestException')
+            ->addUse('Saloon\\Exceptions\\Request\\RequestException');
 
         $duplicateCounter = 1;
         $enumsToImport = [];
 
         foreach ($endpoints as $endpoint) {
-            $requestClassName = NameHelper::resourceClassName($endpoint->name);
+            $requestClassName = NameHelper::requestClassName($endpoint->name);
             $methodName = NameHelper::safeVariableName($requestClassName);
             $requestClassNameAlias = $requestClassName == $resourceName ? "{$requestClassName}Request" : null;
             $requestClassFQN = "{$this->config->namespace}\\{$this->config->requestNamespaceSuffix}\\{$resourceName}\\{$requestClassName}";
@@ -117,6 +119,10 @@ class ResourceGenerator extends Generator
                 $this->addPropertyToMethod($method, $parameter);
                 $args[] = new Literal(sprintf('$%s', NameHelper::safeVariableName($parameter->name)));
             }
+
+            // Add exception annotations at the end, after all parameters
+            $method->addComment('@throws FatalRequestException');
+            $method->addComment('@throws RequestException');
 
             $method->setBody(
                 new Literal(sprintf('return $this->connector->send(new %s(%s));', $requestClassNameAlias ?? $requestClassName, implode(', ', $args)))

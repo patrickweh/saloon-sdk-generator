@@ -20,6 +20,7 @@ use Saloon\Contracts\Body\HasBody;
 use Saloon\Enums\Method as SaloonHttpMethod;
 use Saloon\Http\Request;
 use Saloon\Traits\Body\HasJsonBody;
+use Saloon\Traits\Body\HasFormBody;
 
 class RequestGenerator extends Generator
 {
@@ -61,9 +62,7 @@ class RequestGenerator extends Generator
 
             $namespace->addUse($dtoFullClass);
 
-            $method->addBody('$data = $response->json();');
-            $method->addBody('');
-            $method->addBody("return new \\{$dtoFullClass}(\$data);");
+            $method->addBody("return \\{$dtoFullClass}::from(\$response->json() ?? []);");
         } elseif ($response['type'] === 'array' && isset($response['dto_class'])) {
             // Array of DTOs
             $dtoClass = $response['dto_class'];
@@ -71,30 +70,16 @@ class RequestGenerator extends Generator
 
             $namespace->addUse($dtoFullClass);
 
-            $method->addBody('$items = $response->json();');
-            $method->addBody('');
             $method->addBody('return array_map(');
-            $method->addBody("    fn(\$item) => new \\{$dtoFullClass}(\$item),");
-            $method->addBody('    $items');
+            $method->addBody("    fn(\$item) => \\{$dtoFullClass}::from(\$item),");
+            $method->addBody('    $response->json() ?? []');
             $method->addBody(');');
         } elseif ($response['type'] === 'inline' && isset($response['schema'])) {
-            // For inline schemas, use the generic ApiResponse DTO
-            $apiResponseClass = $this->config->namespace . '\\' . $this->config->dtoNamespaceSuffix . '\\ApiResponse';
-
-            $namespace->addUse($apiResponseClass);
-
-            $method->addBody('$data = $response->json();');
-            $method->addBody('');
-            $method->addBody("return \\{$apiResponseClass}::fromResponse(\$data);");
+            // For inline schemas, return the raw JSON data
+            $method->addBody('return $response->json();');
         } else {
-            // Default: Use ApiResponse for all responses
-            $apiResponseClass = $this->config->namespace . '\\' . $this->config->dtoNamespaceSuffix . '\\ApiResponse';
-
-            $namespace->addUse($apiResponseClass);
-
-            $method->addBody('$data = $response->json();');
-            $method->addBody('');
-            $method->addBody("return \\{$apiResponseClass}::fromResponse(\$data);");
+            // Default: return the raw JSON response
+            $method->addBody('return $response->json();');
         }
     }
 
@@ -114,15 +99,24 @@ class RequestGenerator extends Generator
             ->addComment('')
             ->addComment(Utils::wrapLongLines($endpoint->description ?? ''));
 
-        // TODO: We assume JSON body if post/patch, make these assumptions configurable in the future.
-        if ($endpoint->method->isPost() || $endpoint->method->isPatch()) {
-            $classType
-                ->addImplement(HasBody::class)
-                ->addTrait(HasJsonBody::class);
-
-            $namespace
-                ->addUse(HasBody::class)
-                ->addUse(HasJsonBody::class);
+        // Determine body type based on content type from OpenAPI spec
+        if ($endpoint->method->isPost() || $endpoint->method->isPatch() || $endpoint->method->isPut()) {
+            $classType->addImplement(HasBody::class);
+            $namespace->addUse(HasBody::class);
+            
+            // Use the content type from OpenAPI spec, default to JSON
+            if ($endpoint->contentType === 'application/x-www-form-urlencoded') {
+                $classType->addTrait(HasFormBody::class);
+                $namespace->addUse(HasFormBody::class);
+            } elseif ($endpoint->contentType === 'multipart/form-data') {
+                // For multipart, we also use HasFormBody in Saloon
+                $classType->addTrait(HasFormBody::class);
+                $namespace->addUse(HasFormBody::class);
+            } else {
+                // Default to JSON for 'application/json' or when not specified
+                $classType->addTrait(HasJsonBody::class);
+                $namespace->addUse(HasJsonBody::class);
+            }
         }
 
         $classType->addProperty('method')
