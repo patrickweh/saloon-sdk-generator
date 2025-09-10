@@ -137,14 +137,14 @@ class NameHelper
         // Remove common HTTP method prefixes from the name
         $httpMethods = ['get_', 'post_', 'put_', 'patch_', 'delete_', 'head_', 'options_'];
         $cleanValue = $value;
-        
+
         foreach ($httpMethods as $method) {
             if (str_starts_with(strtolower($value), $method)) {
                 $cleanValue = substr($value, strlen($method));
                 break;
             }
         }
-        
+
         return self::safeClassName($cleanValue, 'Request');
     }
 
