@@ -37,7 +37,7 @@ class EnumGenerator extends Generator
 
                 // Always set the value for backed enums
                 // Convert to string if not already
-                $case->setValue((string)$value);
+                $case->setValue((string) $value);
             }
 
             $results['Enums/' . $className . '.php'] = $file;
@@ -51,6 +51,32 @@ class EnumGenerator extends Generator
         $enums = [];
         $enumSignatures = []; // Track enum value signatures to detect duplicates
 
+        // First, collect enums from components/schemas if they exist
+        if ($specification->components && $specification->components->schemas) {
+            foreach ($specification->components->schemas as $schemaName => $schema) {
+                if (isset($schema->properties)) {
+                    foreach ($schema->properties as $propertyName => $property) {
+                        if (isset($property->enum) && is_array($property->enum)) {
+                            $signature = $this->createEnumSignature($property->enum);
+
+                            if (! isset($enumSignatures[$signature])) {
+                                // Generate enum name based on schema and property name
+                                $enumKey = Str::studly($schemaName) . Str::studly($propertyName);
+
+                                $enumSignatures[$signature] = $enumKey;
+
+                                $enums[$enumKey] = [
+                                    'values' => $property->enum,
+                                    'description' => $property->description ?? null,
+                                    'endpoints' => [], // Will be populated later if used in endpoints
+                                ];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         foreach ($specification->endpoints as $endpoint) {
             // Collect from all parameter types
             $allParameters = array_merge(
@@ -63,7 +89,7 @@ class EnumGenerator extends Generator
                 if ($parameter->hasEnum()) {
                     // Create a signature for these enum values
                     $signature = $this->createEnumSignature($parameter->enumValues);
-                    
+
                     // Check if we already have an enum with these exact values
                     if (isset($enumSignatures[$signature])) {
                         // Reuse the existing enum name
@@ -71,11 +97,11 @@ class EnumGenerator extends Generator
                     } else {
                         // Generate a new enum name
                         $enumKey = $this->generateEnumKey($endpoint, $parameter);
-                        
+
                         // Store the signature mapping
                         $enumSignatures[$signature] = $enumKey;
                         $parameter->enumName = $enumKey;
-                        
+
                         // Add to enums collection
                         $enums[$enumKey] = [
                             'values' => $parameter->enumValues,
@@ -84,10 +110,47 @@ class EnumGenerator extends Generator
                         ];
                     }
                 }
+
+                // Also check nested properties in parameters (for schema enums)
+                $this->collectEnumsFromProperties($parameter, $enums, $enumSignatures, $endpoint);
             }
+
+            // Response data is in $endpoint->response array, not as parameters
+            // We would need to parse the response structure differently
         }
 
         return $enums;
+    }
+
+    /**
+     * Recursively collect enums from nested parameter properties
+     */
+    protected function collectEnumsFromProperties(Parameter $parameter, array &$enums, array &$enumSignatures, Endpoint $endpoint): void
+    {
+        if (! empty($parameter->properties)) {
+            foreach ($parameter->properties as $property) {
+                if ($property->hasEnum()) {
+                    $signature = $this->createEnumSignature($property->enumValues);
+
+                    if (isset($enumSignatures[$signature])) {
+                        $property->enumName = $enumSignatures[$signature];
+                    } else {
+                        $enumKey = $this->generateEnumKey($endpoint, $property);
+                        $enumSignatures[$signature] = $enumKey;
+                        $property->enumName = $enumKey;
+
+                        $enums[$enumKey] = [
+                            'values' => $property->enumValues,
+                            'description' => $property->description,
+                            'endpoints' => [$endpoint->name],
+                        ];
+                    }
+                }
+
+                // Recursively check nested properties
+                $this->collectEnumsFromProperties($property, $enums, $enumSignatures, $endpoint);
+            }
+        }
     }
 
     /**
@@ -97,6 +160,7 @@ class EnumGenerator extends Generator
     {
         // Sort values to ensure consistent signatures
         sort($values);
+
         return json_encode($values);
     }
 
@@ -189,7 +253,7 @@ class EnumGenerator extends Generator
         if (isset($commonParameterNames[$paramName])) {
             return $commonParameterNames[$paramName];
         }
-        
+
         // For parameters like 'twoFaMethod' that appear in multiple endpoints
         // Use a normalized name without the endpoint prefix
         $normalizedName = $this->normalizeParameterName($paramName);
@@ -200,7 +264,7 @@ class EnumGenerator extends Generator
         // Remove HTTP method prefixes from endpoint name
         $httpMethods = ['get_', 'post_', 'put_', 'patch_', 'delete_', 'head_', 'options_'];
         $endpointName = $endpoint->name;
-        
+
         foreach ($httpMethods as $method) {
             if (str_starts_with(strtolower($endpointName), $method)) {
                 $endpointName = substr($endpointName, strlen($method));
@@ -218,7 +282,7 @@ class EnumGenerator extends Generator
 
         return $context . ucfirst($this->normalizeParameterName($paramName));
     }
-    
+
     /**
      * Normalize parameter names to a consistent format
      */
@@ -228,7 +292,7 @@ class EnumGenerator extends Generator
         $name = str_replace('_', ' ', $name);
         $name = ucwords($name);
         $name = str_replace(' ', '', $name);
-        
+
         return $name;
     }
 }

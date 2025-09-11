@@ -19,8 +19,8 @@ use Nette\PhpGenerator\PhpNamespace;
 use Saloon\Contracts\Body\HasBody;
 use Saloon\Enums\Method as SaloonHttpMethod;
 use Saloon\Http\Request;
-use Saloon\Traits\Body\HasJsonBody;
 use Saloon\Traits\Body\HasFormBody;
+use Saloon\Traits\Body\HasJsonBody;
 
 class RequestGenerator extends Generator
 {
@@ -103,7 +103,7 @@ class RequestGenerator extends Generator
         if ($endpoint->method->isPost() || $endpoint->method->isPatch() || $endpoint->method->isPut()) {
             $classType->addImplement(HasBody::class);
             $namespace->addUse(HasBody::class);
-            
+
             // Use the content type from OpenAPI spec, default to JSON
             if ($endpoint->contentType === 'application/x-www-form-urlencoded') {
                 $classType->addTrait(HasFormBody::class);
@@ -148,8 +148,9 @@ class RequestGenerator extends Generator
         // Get the namespace for enum type resolution
         $currentNamespace = "{$this->config->namespace}\\{$this->config->requestNamespaceSuffix}\\{$resourceName}";
 
-        // Collect all enum types that need to be imported
+        // Collect all enum and DTO types that need to be imported
         $enumsToImport = [];
+        $dtosToImport = [];
         $allParameters = array_merge(
             $endpoint->pathParameters,
             $endpoint->bodyParameters,
@@ -163,11 +164,24 @@ class RequestGenerator extends Generator
                 $enumFQN = "{$this->config->namespace}\\Enums\\{$enumClass}";
                 $enumsToImport[$enumFQN] = $enumClass;
             }
+
+            // Check if parameter type looks like a DTO class name
+            if (Str::startsWith($parameter->type, Str::studly($parameter->type))) {
+                // This is likely a DTO class (starts with uppercase)
+                $dtoClass = $parameter->type;
+                $dtoFQN = "{$this->config->namespace}\\{$this->config->dtoNamespaceSuffix}\\{$dtoClass}";
+                $dtosToImport[$dtoFQN] = $dtoClass;
+            }
         }
 
         // Import all collected enum types
         foreach ($enumsToImport as $enumFQN => $enumClass) {
             $namespace->addUse($enumFQN);
+        }
+
+        // Import all collected DTO types
+        foreach ($dtosToImport as $dtoFQN => $dtoClass) {
+            $namespace->addUse($dtoFQN);
         }
 
         // Priority 1. - Path Parameters

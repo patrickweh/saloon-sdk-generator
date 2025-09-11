@@ -174,14 +174,27 @@ class ConnectorGenerator extends Generator
         $classConstructor = $classType->addMethod('__construct');
 
         // Add Base Url Property
-        foreach ($specification->baseUrl->parameters as $parameter) {
+        if (! empty($specification->baseUrl->parameters)) {
+            foreach ($specification->baseUrl->parameters as $parameter) {
+                MethodGeneratorHelper::addParameterAsPromotedProperty(
+                    $classConstructor,
+                    new Parameter(
+                        type: 'string',
+                        nullable: false,
+                        name: $parameter->name,
+                        description: $parameter->description
+                    )
+                );
+            }
+        } else {
+            // If no URL parameters are defined, add a generic 'url' parameter
             MethodGeneratorHelper::addParameterAsPromotedProperty(
                 $classConstructor,
                 new Parameter(
                     type: 'string',
                     nullable: false,
-                    name: $parameter->name,
-                    description: $parameter->description
+                    name: 'url',
+                    description: 'The base URL for the API'
                 )
             );
         }
@@ -350,15 +363,27 @@ class ConnectorGenerator extends Generator
 
     protected function addResolveBaseUrlMethod(ClassType $classType, ApiSpecification $specification): ClassType
     {
-        $params = [];
-        foreach ($specification->baseUrl->parameters as $parameter) {
-            $params[$parameter->name] = sprintf('{$this->%s}', NameHelper::safeVariableName($parameter->name));
-        }
-        $baseUrlWithParams = TemplateHelper::render($specification->baseUrl->url ?? 'TODO', $params);
+        if (! empty($specification->baseUrl->parameters)) {
+            $params = [];
+            foreach ($specification->baseUrl->parameters as $parameter) {
+                $params[$parameter->name] = sprintf('{$this->%s}', NameHelper::safeVariableName($parameter->name));
+            }
+            $baseUrlWithParams = TemplateHelper::render($specification->baseUrl->url ?? 'TODO', $params);
 
-        $classType->addMethod('resolveBaseUrl')
-            ->setReturnType('string')
-            ->setBody(new Literal(sprintf('return "%s";', $baseUrlWithParams)));
+            $classType->addMethod('resolveBaseUrl')
+                ->setReturnType('string')
+                ->setBody(new Literal(sprintf('return "%s";', $baseUrlWithParams)));
+        } else {
+            // If no URL parameters, use the url property and append the API path
+            $apiPath = str_replace($specification->baseUrl->url ?? '', '', '/api/v2');
+            if (empty($apiPath)) {
+                $apiPath = '/api/v2'; // Default if not specified
+            }
+
+            $classType->addMethod('resolveBaseUrl')
+                ->setReturnType('string')
+                ->setBody(new Literal(sprintf('return $this->url . "%s";', $apiPath)));
+        }
 
         return $classType;
     }

@@ -24,6 +24,7 @@ use Crescat\SaloonSdkGenerator\Data\Generator\Parameter;
 use Crescat\SaloonSdkGenerator\Data\Generator\SecurityScheme;
 use Crescat\SaloonSdkGenerator\Data\Generator\SecuritySchemeType;
 use Crescat\SaloonSdkGenerator\Data\Generator\ServerParameter;
+use Crescat\SaloonSdkGenerator\Helpers\NameHelper;
 use Illuminate\Support\Str;
 
 class OpenApiParser implements Parser
@@ -49,6 +50,65 @@ class OpenApiParser implements Parser
             components: $this->parseComponents($this->openApi->components),
             endpoints: $this->parseItems($this->openApi->paths)
         );
+    }
+
+    /**
+     * Determine the collection based on the path and tag
+     */
+    protected function determineCollection(string $path, ?string $tag): ?string
+    {
+        // Extract the first segment of the path
+        $segments = explode('/', trim($path, '/'));
+        $firstSegment = $segments[0] ?? null;
+
+        if (! $firstSegment) {
+            return $tag;
+        }
+
+        // Map path prefixes to better collection names
+        $pathMapping = [
+            'dns' => 'Dns',
+            'domain' => 'Domains',
+            'handle' => 'Handles',
+            'mail' => 'Emails',
+            'user' => 'Users',
+            'auth' => 'Auth',
+            'webspace' => 'Webspaces',
+            'tls' => 'Ssl',
+            'reseller' => 'Resellers',
+            'billing' => 'Billing',
+            'invoice' => 'Invoices',
+            'payment' => 'Payments',
+            'rights' => 'Rights',
+            'setting' => 'Settings',
+            'batch' => 'Batch',
+            'ticket' => 'Tickets',
+            'maintenance' => 'Maintenance',
+            'flexdns' => 'FlexDns',
+            'gdpr' => 'Gdpr',
+            'pgp' => 'Pgp',
+            'vns' => 'Vns',
+            'ens' => 'Ens',
+            'tld' => 'Tlds',
+            'stats' => 'Statistics',
+            'prices' => 'Prices',
+            'product' => 'Products',
+            'affiliate' => 'Affiliates',
+            'resellerPrices' => 'ResellerPrices',
+            'file' => 'Files',
+            'log' => 'Logs',
+            'messageQueue' => 'MessageQueue',
+            'domainContent' => 'DomainContent',
+            'domainParking' => 'DomainParking',
+        ];
+
+        // Check if we have a specific mapping for this path prefix
+        if (isset($pathMapping[$firstSegment])) {
+            return $pathMapping[$firstSegment];
+        }
+
+        // Otherwise use the tag or capitalize the first segment
+        return $tag ?: ucfirst($firstSegment);
     }
 
     /**
@@ -174,7 +234,7 @@ class OpenApiParser implements Parser
         // Parse body parameters from requestBody
         $bodyParameters = [];
         $contentType = null;
-        
+
         if ($operation->requestBody && $operation->requestBody->content) {
             // Determine content type
             if (isset($operation->requestBody->content['application/json'])) {
@@ -246,65 +306,6 @@ class OpenApiParser implements Parser
         return $requests;
     }
 
-    /**
-     * Determine the collection based on the path and tag
-     */
-    protected function determineCollection(string $path, ?string $tag): ?string
-    {
-        // Extract the first segment of the path
-        $segments = explode('/', trim($path, '/'));
-        $firstSegment = $segments[0] ?? null;
-        
-        if (!$firstSegment) {
-            return $tag;
-        }
-        
-        // Map path prefixes to better collection names
-        $pathMapping = [
-            'dns' => 'Dns',
-            'domain' => 'Domains',
-            'handle' => 'Handles',
-            'mail' => 'Emails',
-            'user' => 'Users',
-            'auth' => 'Auth',
-            'webspace' => 'Webspaces',
-            'tls' => 'Ssl',
-            'reseller' => 'Resellers',
-            'billing' => 'Billing',
-            'invoice' => 'Invoices',
-            'payment' => 'Payments',
-            'rights' => 'Rights',
-            'setting' => 'Settings',
-            'batch' => 'Batch',
-            'ticket' => 'Tickets',
-            'maintenance' => 'Maintenance',
-            'flexdns' => 'FlexDns',
-            'gdpr' => 'Gdpr',
-            'pgp' => 'Pgp',
-            'vns' => 'Vns',
-            'ens' => 'Ens',
-            'tld' => 'Tlds',
-            'stats' => 'Statistics',
-            'prices' => 'Prices',
-            'product' => 'Products',
-            'affiliate' => 'Affiliates',
-            'resellerPrices' => 'ResellerPrices',
-            'file' => 'Files',
-            'log' => 'Logs',
-            'messageQueue' => 'MessageQueue',
-            'domainContent' => 'DomainContent',
-            'domainParking' => 'DomainParking',
-        ];
-        
-        // Check if we have a specific mapping for this path prefix
-        if (isset($pathMapping[$firstSegment])) {
-            return $pathMapping[$firstSegment];
-        }
-        
-        // Otherwise use the tag or capitalize the first segment
-        return $tag ?: ucfirst($firstSegment);
-    }
-    
     protected function parseResponseSchema($schema): ?array
     {
         // Handle schema references
@@ -353,7 +354,7 @@ class OpenApiParser implements Parser
                 'pushRequest' => 'PushRequest',
                 'pushRequests' => ['type' => 'array', 'dto_class' => 'PushRequest'],
             ];
-            
+
             // Check each property to see if it maps to a DTO
             foreach ($schema->properties as $propName => $propSchema) {
                 if (isset($dtoMappings[$propName])) {
@@ -361,13 +362,14 @@ class OpenApiParser implements Parser
                     if (is_array($mapping)) {
                         return $mapping;
                     }
+
                     return [
                         'type' => 'dto',
                         'dto_class' => $mapping,
                     ];
                 }
             }
-            
+
             // For inline schemas that don't match known patterns, return as inline
             return [
                 'type' => 'inline',
@@ -388,7 +390,7 @@ class OpenApiParser implements Parser
                     ];
                 }
             }
-            
+
             // For direct array responses (like domain/list that returns array of domains)
             // Check if this is likely a list endpoint that should return DTOs
             // This is a bit of a hack but necessary for APIs that return arrays directly
@@ -421,8 +423,8 @@ class OpenApiParser implements Parser
             $refPath = $schema->getReference();
             if (str_starts_with($refPath, '#/components/schemas/')) {
                 $schemaName = str_replace('#/components/schemas/', '', $refPath);
-                if (isset($this->components?->schemas[$schemaName])) {
-                    $schema = $this->components->schemas[$schemaName];
+                if (isset($this->openApi->components?->schemas[$schemaName])) {
+                    $schema = $this->openApi->components->schemas[$schemaName];
                 }
             }
         }
@@ -430,26 +432,83 @@ class OpenApiParser implements Parser
         // Parse properties from schema
         if ($schema && isset($schema->properties)) {
             foreach ($schema->properties as $propertyName => $property) {
-                // Skip if property is a reference (complex object)
-                if ($property instanceof Reference) {
-                    continue;
-                }
-
                 $isRequired = in_array($propertyName, $schema->required ?? []);
-                $enumValues = $property->enum ?? null;
+                $type = 'mixed';
+                $enumValues = null;
                 $enumName = null;
+                $description = null;
 
-                if ($enumValues) {
-                    // Generate enum name from property name
-                    // Keep simple for common names, otherwise will be updated by EnumGenerator
-                    $enumName = ucfirst($propertyName);
+                // Handle property references (complex objects)
+                if ($property instanceof Reference) {
+                    $refPath = $property->getReference();
+                    if (str_starts_with($refPath, '#/components/schemas/')) {
+                        $schemaName = str_replace('#/components/schemas/', '', $refPath);
+                        // Recursively expand the referenced schema into individual properties
+                        if (isset($this->openApi->components?->schemas[$schemaName])) {
+                            $referencedSchema = $this->openApi->components->schemas[$schemaName];
+                            if ($referencedSchema && isset($referencedSchema->properties)) {
+                                // Expand each property of the referenced schema with a prefix
+                                foreach ($referencedSchema->properties as $subPropName => $subProperty) {
+                                    $prefixedName = $propertyName . '_' . $subPropName;
+                                    $subIsRequired = in_array($subPropName, $referencedSchema->required ?? []);
+                                    $subType = 'mixed';
+                                    $subDescription = null;
+
+                                    if (! ($subProperty instanceof Reference)) {
+                                        $subType = $this->mapSchemaTypeToPhpType($subProperty->type ?? 'mixed');
+                                        $subDescription = $subProperty->description ?? null;
+                                    }
+
+                                    $parameters[] = new Parameter(
+                                        type: $subType,
+                                        nullable: true, // All sub-properties should be nullable since the parent is optional
+                                        name: $prefixedName,
+                                        description: $subDescription,
+                                        enumValues: null,
+                                        enumName: null,
+                                        parentProperty: $propertyName // Track the parent property
+                                    );
+                                }
+
+                                // Skip adding the parent property since we've expanded it
+                                continue;
+                            }
+                        }
+                        // Fallback to using the DTO class name if we can't expand
+                        $type = NameHelper::dtoClassName($schemaName);
+                    } else {
+                        $type = 'mixed';
+                    }
+                } else {
+                    // Simple property
+                    $type = $this->mapSchemaTypeToPhpType($property->type ?? 'mixed');
+                    $description = $property->description ?? null;
+                    $enumValues = $property->enum ?? null;
+
+                    if ($enumValues) {
+                        // Generate enum name from property name
+                        $enumName = ucfirst($propertyName);
+                    }
+
+                    // Handle arrays with items
+                    if ($property->type === 'array' && isset($property->items)) {
+                        if ($property->items instanceof Reference) {
+                            $refPath = $property->items->getReference();
+                            if (str_starts_with($refPath, '#/components/schemas/')) {
+                                $itemSchemaName = str_replace('#/components/schemas/', '', $refPath);
+                                $type = 'array'; // Could be enhanced to track array of specific DTOs
+                            }
+                        } else {
+                            $type = 'array';
+                        }
+                    }
                 }
 
                 $parameters[] = new Parameter(
-                    type: $this->mapSchemaTypeToPhpType($property->type ?? 'mixed'),
+                    type: $type,
                     nullable: ! $isRequired,
                     name: $propertyName,
-                    description: $property->description ?? null,
+                    description: $description,
                     enumValues: $enumValues,
                     enumName: $enumName
                 );

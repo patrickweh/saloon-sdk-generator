@@ -105,33 +105,66 @@ class MethodGeneratorHelper
      */
     protected static function buildParameterArray(array $parameters): array
     {
-        return collect($parameters)
-            ->mapWithKeys(function (Parameter $parameter) {
+        $result = [];
+        $nestedGroups = [];
+
+        // First, group parameters by their parent property
+        foreach ($parameters as $parameter) {
+            if ($parameter->parentProperty) {
+                // This is a nested property
+                if (! isset($nestedGroups[$parameter->parentProperty])) {
+                    $nestedGroups[$parameter->parentProperty] = [];
+                }
+                // Remove the parent prefix from the name
+                $originalName = str_replace($parameter->parentProperty . '_', '', $parameter->name);
+                $nestedGroups[$parameter->parentProperty][$originalName] = $parameter;
+            } else {
+                // This is a top-level property
                 $varName = NameHelper::safeVariableName($parameter->name);
+
                 // If this is an enum parameter, we need to get its value
                 if ($parameter->hasEnum()) {
                     // Handle nullable enums
                     if ($parameter->nullable) {
-                        return [
-                            $parameter->name => new Literal(
-                                sprintf('$this->%s?->value', $varName)
-                            ),
-                        ];
-                    }
-
-                    return [
-                        $parameter->name => new Literal(
+                        $result[$parameter->name] = new Literal(
+                            sprintf('$this->%s?->value', $varName)
+                        );
+                    } else {
+                        $result[$parameter->name] = new Literal(
                             sprintf('$this->%s->value', $varName)
-                        ),
-                    ];
-                }
-
-                return [
-                    $parameter->name => new Literal(
+                        );
+                    }
+                } else {
+                    $result[$parameter->name] = new Literal(
                         sprintf('$this->%s', $varName)
-                    ),
-                ];
-            })
-            ->toArray();
+                    );
+                }
+            }
+        }
+
+        // Now handle nested groups
+        foreach ($nestedGroups as $parentName => $nestedParams) {
+            $nestedArray = [];
+            $hasAnyValue = false;
+
+            foreach ($nestedParams as $propName => $parameter) {
+                $varName = NameHelper::safeVariableName($parameter->name);
+                $value = new Literal(sprintf('$this->%s', $varName));
+                $nestedArray[$propName] = $value;
+
+                // Check if any nested property has a value
+                if (! $parameter->nullable) {
+                    $hasAnyValue = true;
+                }
+            }
+
+            // Only add the nested object if it has any required values or we want to include it
+            // For now, we'll use array_filter to remove nulls
+            $result[$parentName] = new Literal(
+                sprintf('array_filter(%s)', (new Dumper())->dump($nestedArray))
+            );
+        }
+
+        return $result;
     }
 }

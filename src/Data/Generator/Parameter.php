@@ -10,7 +10,8 @@ class Parameter
         public string $name,
         public ?string $description = null,
         public ?array $enumValues = null,
-        public ?string $enumName = null
+        public ?string $enumName = null,
+        public ?string $parentProperty = null // Track which nested object this belongs to
     ) {}
 
     public function hasEnum(): bool
