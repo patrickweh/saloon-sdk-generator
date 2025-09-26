@@ -60,7 +60,8 @@ class RequestGenerator extends Generator
             $dtoClass = $response['dto_class'];
             $dtoFullClass = $this->config->namespace . '\\' . $this->config->dtoNamespaceSuffix . '\\' . $dtoClass;
 
-            $namespace->addUse($dtoFullClass);
+            // Use fully qualified class name instead of import to avoid naming conflicts
+            // $namespace->addUse($dtoFullClass);
 
             $method->addBody("return \\{$dtoFullClass}::from(\$response->json() ?? []);");
         } elseif ($response['type'] === 'array' && isset($response['dto_class'])) {
@@ -68,7 +69,8 @@ class RequestGenerator extends Generator
             $dtoClass = $response['dto_class'];
             $dtoFullClass = $this->config->namespace . '\\' . $this->config->dtoNamespaceSuffix . '\\' . $dtoClass;
 
-            $namespace->addUse($dtoFullClass);
+            // Use fully qualified class name instead of import to avoid naming conflicts
+            // $namespace->addUse($dtoFullClass);
 
             $method->addBody('return array_map(');
             $method->addBody("    fn(\$item) => \\{$dtoFullClass}::from(\$item),");
@@ -87,6 +89,11 @@ class RequestGenerator extends Generator
     {
         $resourceName = NameHelper::resourceClassName($endpoint->collection ?: $this->config->fallbackResourceName);
         $className = NameHelper::requestClassName($endpoint->name);
+        
+        // Ensure the class name ends with 'Request' to avoid conflicts with DTOs
+        if (!Str::endsWith($className, 'Request')) {
+            $className .= 'Request';
+        }
 
         $classType = new ClassType($className);
 

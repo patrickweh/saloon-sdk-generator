@@ -24,6 +24,13 @@ class EnumGenerator extends Generator
             $file->setStrictTypes();
 
             $namespace = $file->addNamespace($namespace);
+            
+            // Clean the class name to ensure it's valid
+            $className = preg_replace('/[^a-zA-Z0-9_]/', '', $className);
+            if (empty($className) || is_numeric($className[0])) {
+                $className = 'Enum' . $className;
+            }
+            
             $enum = $namespace->addEnum($className);
 
             // All enums should be backed string enums for consistency
@@ -62,6 +69,12 @@ class EnumGenerator extends Generator
                             if (! isset($enumSignatures[$signature])) {
                                 // Generate enum name based on schema and property name
                                 $enumKey = Str::studly($schemaName) . Str::studly($propertyName);
+                                
+                                // Clean the enum key to ensure valid PHP class name
+                                $enumKey = preg_replace('/[^a-zA-Z0-9_]/', '', $enumKey);
+                                if (empty($enumKey) || is_numeric($enumKey[0])) {
+                                    $enumKey = 'Enum' . $enumKey;
+                                }
 
                                 $enumSignatures[$signature] = $enumKey;
 
@@ -280,7 +293,19 @@ class EnumGenerator extends Generator
             $context = Str::studly($endpointName);
         }
 
-        return $context . ucfirst($this->normalizeParameterName($paramName));
+        // Clean the context and parameter name to ensure valid PHP class name
+        $context = preg_replace('/[^a-zA-Z0-9_]/', '', $context);
+        $paramName = $this->normalizeParameterName($paramName);
+        
+        $result = $context . ucfirst($paramName);
+        
+        // Final cleanup to ensure valid class name
+        $result = preg_replace('/[^a-zA-Z0-9_]/', '', $result);
+        if (empty($result) || is_numeric($result[0])) {
+            $result = 'Enum' . $result;
+        }
+        
+        return $result;
     }
 
     /**

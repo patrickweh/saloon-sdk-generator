@@ -259,7 +259,12 @@ class OpenApiParser implements Parser
         $responseInfo = null;
         if ($operation->responses && isset($operation->responses['200'])) {
             $response = $operation->responses['200'];
-            if ($response->content && isset($response->content['application/json'])) {
+            
+            // Handle Reference objects in responses
+            if ($response instanceof Reference) {
+                // Skip reference responses for now
+                $responseInfo = null;
+            } elseif ($response->content && isset($response->content['application/json'])) {
                 $jsonContent = $response->content['application/json'];
                 if ($jsonContent->schema) {
                     $responseInfo = $this->parseResponseSchema($jsonContent->schema);
@@ -313,6 +318,12 @@ class OpenApiParser implements Parser
             $refPath = $schema->getReference();
             if (str_starts_with($refPath, '#/components/schemas/')) {
                 $schemaName = str_replace('#/components/schemas/', '', $refPath);
+                
+                // Clean the schema name to ensure valid PHP class name
+                $schemaName = preg_replace('/[^a-zA-Z0-9_]/', '', $schemaName);
+                if (empty($schemaName) || is_numeric($schemaName[0])) {
+                    $schemaName = 'Dto' . $schemaName;
+                }
 
                 // Return the schema name to be used as DTO class name
                 return [
@@ -383,6 +394,12 @@ class OpenApiParser implements Parser
                 $refPath = $schema->items->getReference();
                 if (str_starts_with($refPath, '#/components/schemas/')) {
                     $schemaName = str_replace('#/components/schemas/', '', $refPath);
+                    
+                    // Clean the schema name to ensure valid PHP class name
+                    $schemaName = preg_replace('/[^a-zA-Z0-9_]/', '', $schemaName);
+                    if (empty($schemaName) || is_numeric($schemaName[0])) {
+                        $schemaName = 'Dto' . $schemaName;
+                    }
 
                     return [
                         'type' => 'array',

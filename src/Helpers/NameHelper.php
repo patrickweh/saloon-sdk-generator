@@ -145,7 +145,14 @@ class NameHelper
             }
         }
 
-        return self::safeClassName($cleanValue, 'Request');
+        $result = self::safeClassName($cleanValue, 'Request');
+        
+        // Ensure the class name always ends with 'Request' to avoid conflicts with DTOs
+        if (!Str::endsWith($result, 'Request')) {
+            $result .= 'Request';
+        }
+        
+        return $result;
     }
 
     public static function resourceClassName(string $value): string
